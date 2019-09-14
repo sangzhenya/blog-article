@@ -663,9 +663,13 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
     for (int i = 0, bound = 0;;) {
         Node<K,V> f; int fh;
         while (advance) {
+            // nextIndex: 最后一个元素
+            // nextBound: table 长度减去 桶的大小 stride，最小是 16
             int nextIndex, nextBound;
+            // 如果再当前桶中，直接下一个
             if (--i >= bound || finishing)
                 advance = false;
+            // 第一次 transferIndex 是原始 table 的长度
             else if ((nextIndex = transferIndex) <= 0) {
                 i = -1;
                 advance = false;
@@ -674,13 +678,17 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                      (this, TRANSFERINDEX, nextIndex,
                       nextBound = (nextIndex > stride ?
                                    nextIndex - stride : 0))) {
+                // 设置 bound = next - stride 最小为 0，就是当前处理的区间
                 bound = nextBound;
+                // 应该处理的第一个元素
                 i = nextIndex - 1;
                 advance = false;
             }
         }
+        // 下面是结束的条件
         if (i < 0 || i >= n || i + n >= nextn) {
             int sc;
+            // 如果已经结束则删除 nextTable，并把nextTable 放到 table ，设置新的阈值
             if (finishing) {
                 nextTable = null;
                 table = nextTab;
@@ -694,17 +702,21 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                 i = n; // recheck before commit
             }
         }
+        // 如果为空则直接设置为空
         else if ((f = tabAt(tab, i)) == null)
             advance = casTabAt(tab, i, null, fwd);
+        // 如果当前元素的 hash 为 MOVED 则表示当前元素已经被处理过了
         else if ((fh = f.hash) == MOVED)
             advance = true; // already processed
         else {
+            // 同步锁处理非空的坐标
             synchronized (f) {
                 if (tabAt(tab, i) == f) {
                     Node<K,V> ln, hn;
                     if (fh >= 0) {
                         int runBit = fh & n;
                         Node<K,V> lastRun = f;
+                        // 获取新的下标
                         for (Node<K,V> p = f.next; p != null; p = p.next) {
                             int b = p.hash & n;
                             if (b != runBit) {
@@ -712,14 +724,17 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                                 lastRun = p;
                             }
                         }
+                        // 如果下标为 0 设置低位为 需要处理的元素
                         if (runBit == 0) {
                             ln = lastRun;
                             hn = null;
                         }
+                        // 否则设置高位为需要处理的元素
                         else {
                             hn = lastRun;
                             ln = null;
                         }
+                        // 复制元素，分别到高位和低位两个链表中
                         for (Node<K,V> p = f; p != lastRun; p = p.next) {
                             int ph = p.hash; K pk = p.key; V pv = p.val;
                             if ((ph & n) == 0)
@@ -727,12 +742,15 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                             else
                                 hn = new Node<K,V>(ph, pk, pv, hn);
                         }
+                        // 分别设置低位和高位的元素
                         setTabAt(nextTab, i, ln);
                         setTabAt(nextTab, i + n, hn);
+                        // 设置当前坐标已经处理过了
                         setTabAt(tab, i, fwd);
                         advance = true;
                     }
                     else if (f instanceof TreeBin) {
+                        // 对于树的处理方式
                         TreeBin<K,V> t = (TreeBin<K,V>)f;
                         TreeNode<K,V> lo = null, loTail = null;
                         TreeNode<K,V> hi = null, hiTail = null;
@@ -774,11 +792,62 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
 }
 ```
 
-
+```java
+// 如果一个线程发现正在扩容，在参与到扩容之中
+final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
+    Node<K,V>[] nextTab; int sc;
+    // 取出 nextTable 进行初始化
+    if (tab != null && (f instanceof ForwardingNode) &&
+        (nextTab = ((ForwardingNode<K,V>)f).nextTable) != null) {
+        int rs = resizeStamp(tab.length);
+        // 确保还没有变化
+        while (nextTab == nextTable && table == tab &&
+               (sc = sizeCtl) < 0) {
+            if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
+                sc == rs + MAX_RESIZERS || transferIndex <= 0)
+                break;
+            if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
+                // 参与到扩容之中
+                transfer(tab, nextTab);
+                break;
+            }
+        }
+        return nextTab;
+    }
+    return table;
+}
+```
 
 
 
 ### Get 操作
+
+```java
+// 获取元素
+public V get(Object key) {
+    Node<K,V>[] tab; Node<K,V> e, p; int n, eh; K ek;
+    // 获取 hash
+    int h = spread(key.hashCode());
+    if ((tab = table) != null && (n = tab.length) > 0 &&
+        (e = tabAt(tab, (n - 1) & h)) != null) {
+        if ((eh = e.hash) == h) {
+            // 如果找到直接返回
+            if ((ek = e.key) == key || (ek != null && key.equals(ek)))
+                return e.val;
+        }
+        // 如果小于 0 则从树上找
+        else if (eh < 0)
+            return (p = e.find(h, key)) != null ? p.val : null;
+        // 如果没有找到表明可能是链表，则遍历找
+        while ((e = e.next) != null) {
+            if (e.hash == h &&
+                ((ek = e.key) == key || (ek != null && key.equals(ek))))
+                return e.val;
+        }
+    }
+    return null;
+}
+```
 
 
 
