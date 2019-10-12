@@ -26,7 +26,7 @@ release savepoint savepoint_name
 
 隔离级别如下图所示：
 
-![MySQL 隔离级别](https://i.loli.net/2019/10/12/wij4oSPhEMr9WGk.png)
+![MySQL 隔离级别]( http://img.sangzhenya.com/Snipaste_2019-10-12_16-34-58.png )
 
 ### 视图
 
@@ -102,7 +102,7 @@ call procedure_name([args])
 
 ### Join 查询
 
-![七种 Join](https://i.loli.net/2019/10/12/WcPXlpgk4fIHT2w.png)
+![七种 Join](http://img.sangzhenya.com/WcPXlpgk4fIHT2w.png)
 
 1. 左连接 left join
 2. 右连接 right join
