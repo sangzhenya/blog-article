@@ -66,11 +66,27 @@ B+ 树是 B 树的一种变形，非叶子节点只保存索引，不保存实�
 4. 经常增删改的表
 5. 数据重复且分布平均的表字段，因此应该只是为最经常查询和最经常排序的数据列建立索引
 
+### 基本使用
+
+```mysql
+-- 创建
+create [unique] index index_name on table_name(column_name(length));
+alter table_name add [unique] index index_name on (column_name(length));
+
+-- 删除
+drop index index_name on table_name;
+
+-- 查看
+show index from table_name;
+```
+
 ### 常见瓶颈
 
 一般发生在数据装入内存或从磁盘上读取数据的时候可能会出现 CPU 饱和，而 磁盘 IO 瓶颈发生在装入数据远大于内存容量的时候。
 
 ### Explain 分析
+
+使用 Explain 可以模拟优化器执行 SQL 查询语句，从而知道MySQL 是如何处理 SQL 的，进而分析查询语句或者表结构的性能瓶颈。主要可以查询表的读取顺序，数据读取操作的操作类型，哪些索引可以被使用，哪些索引实际被使用，表之间的引用，每张表有多少行被优化器查询等。
 
 ### 索引优化
 
