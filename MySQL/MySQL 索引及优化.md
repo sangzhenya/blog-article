@@ -86,7 +86,68 @@ show index from table_name;
 
 ### Explain 分析
 
-使用 Explain 可以模拟优化器执行 SQL 查询语句，从而知道MySQL 是如何处理 SQL 的，进而分析查询语句或者表结构的性能瓶颈。主要可以查询表的读取顺序，数据读取操作的操作类型，哪些索引可以被使用，哪些索引实际被使用，表之间的引用，每张表有多少行被优化器查询等。
+使用 Explain 可以模拟优化器执行 SQL 查询语句，从而知道MySQL 是如何处理 SQL 的，进而分析查询语句或者表结构的性能瓶颈。主要可以查询表的读取顺序，数据读取操作的操作类型，哪些索引可以被使用，哪些索引实际被使用，表之间的引用，每张表有多少行被优化器查询等。主要包含以下内容：
+
+![Explain 查询内容](http://img.sangzhenya.com/Snipaste_2019-10-14_22-16-36.png)
+
+#### id
+
+##### id 相同
+
+执行顺序由上至下
+
+```mysql
+explain select ce.id, ac.id from category ce where ce.id in (select ac.category_id from article ac);
+```
+
+![Explain ID 1](http://img.sangzhenya.com/Snipaste_2019-10-14_22-58-45.png)
+
+##### id 不同
+
+如果是子查询，id 的序号递增，值越大优先级越高，越先被执行
+
+```mysql
+explain select ac.title from article ac where ac.category_id = (select ce.id from category ce where ce.id = 61);
+```
+
+![id 不同](http://img.sangzhenya.com/Snipaste_2019-10-14_23-07-13.png)
+
+##### id 不同和相同同时存在
+
+id 如果相同则可以认为是一组，从上往下执行；在所有组中，id 值越大，优先级越高，越先被执行。
+
+#### select_type
+
+主要有 6 种
+
+1. SIMPLE：简单的 select 查询，查询是不包含子查询和 union
+2. PRIMARY：查询中若包含任何复杂的子部分，最外层查询则被标记为 PRIMARY
+3. SUBQUERY：在 SELECT 或 WHERE 列表中包含了 子查询
+4. DERIVED：在 From 列表中包含的子查询被标记为 DERIVED ，MySQL 中递归执行这些子查询，把结果放到临时表中
+5. UNION：若第二个 SELECT 出现在 UNION 之后则被标记为 UNION，若 UION 包含在 FROM 查询语句的子查询中，外层 SELECT 被标记为 DERIVED
+6. UNION RESULT 从 UNION 表获取的 SELECT
+
+#### table
+
+#### partitions
+
+#### type
+
+#### possible_keys
+
+#### key
+
+#### key_len
+
+#### ref
+
+#### rows
+
+#### filtered
+
+#### Extra
+
+
 
 ### 索引优化
 
