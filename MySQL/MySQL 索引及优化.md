@@ -177,14 +177,14 @@ id 如果相同则可以认为是一组，从上往下执行；在所有组中�
 
 其他重要从信息，主要可能出现以下几种类型：
 
-1. Using filesort:
-2. Using temporary:
-3. Using index
-4. Using where
-5. Using join buffer
-6. impossible where
-7. select tables optimized way
-8. distinct
+1. Using filesort： 说明 MySQL 会对数据使用一个外部的索引排序，而不是按照表内的索引顺序进行读取。MySQL 中无法利用索引完成的排序操作称为 “文件排序”。
+2. Using temporary： 使用了临时表保存中间结果， MySQL 在对查询结果排序时使用临时表。常见于排序 order by 和分组查询 group by。
+3. Using index：表示相应的 色乐天 操作中使用了 覆盖索引，避免访问了表的数据行。如果同时出现 using where 表明索引被用来执行索引键值的查找；如果没有同时出现 using where 则表明索引用来读取数据而非执行查找动作。
+4. Using where：使用了 where 过滤。
+5. Using join buffer：使用了连接缓存
+6. impossible where： where 字句的值总是 false，不能用来获取任何元祖。
+7. select tables optimized way：在没有 groupby 字句的情况下，基于索引优化的 MIN/MAX 操作或者对于 MyISAM 存储引擎优化 COUNT(*) 操作，不必等到执行阶段在进行计算，查询执行计划生成的阶段即完成优化。
+8. distinct：优化 distinct 操作，在找到第一匹配的元组后即停止找同样值的动作。
 
 ### 索引优化
 
