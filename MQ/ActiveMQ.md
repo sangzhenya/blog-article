@@ -177,11 +177,13 @@ public class TConsumer {
 
 
 
-### JMS 开发
+### JMS 
+
+#### 概要
 
 Java 消息服务， 是 JavaEE 中的一个技术。指的是两个应用程序直接进行异步通讯的 API，它为标准消息协议和消息服务提供了一组通用的接口，包括创建，发送，读取消息等，用于支持 Java 应用程序的开发。在 JavaEE 中当两个应用程序使用 JMS 进行通讯时，它们直接并不是直接相连的，而是通过一个共同的消息收发服务组件关联起来以达到解耦，异步，削峰的效果。
 
-主要有以下四个内容：
+#### 重要组成
 
 1. JMS Provider： 实现 JMS 接口和规范的消息中间件，即 MQ 服务器。
 
@@ -219,9 +221,111 @@ Java 消息服务， 是 JavaEE 中的一个技术。指的是两个应用程序
 
       以属性名和属性值的形式指定的键值对，是消息头的扩展，指定一些附加信息。例如 `message.setStringProperty("auth", "Key)`
 
+#### JMS 持久性/事务/签收
+
+##### 持久性
+
+非持久性时（`DeliveryMode.NON_PERSISTENT`）当服务器宕机，消息不存在；持久性时（`DeliveryMode.PERSISTENT`），服务器宕机，消息仍然存在。
+
+Queue 上的消息默认是持久性的。
+
+Topic  的持久性设置如下：
+
+**Producer**
+
+```java
+public class TProducerPersistent {
+    private static final String URL = "tcp://localhost:61616";
+    private static final String TOPIC_NAME = "DEMO.QUEUE.TEST.PERSISTENT001";
+    public static void main(String[] args) throws JMSException, IOException {
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
+        Connection connection = connectionFactory.createConnection();
+        Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        Destination destination = session.createTopic(TOPIC_NAME);
+        MessageProducer producer = session.createProducer(destination);
+        producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+        connection.start();
+        for (int i = 0; i < 3; i++) {
+            Message textMessage = session.createTextMessage("Hello " + i);
+            producer.send(textMessage);
+        }
+        producer.close();
+        session.close();
+        connection.close();
+    }
+}
+```
+
+**Consumer**
+
+```java
+public class TConsumerPersistent {
+    private static final String URL = "tcp://localhost:61616";
+    private static final String TOPIC_NAME = "DEMO.QUEUE.TEST.PERSISTENT001";
+    public static void main(String[] args) throws JMSException, IOException {
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
+        Connection connection = connectionFactory.createConnection();
+        connection.setClientID("PERSISTENT001");
+        Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        Topic destination = session.createTopic(TOPIC_NAME);
+        TopicSubscriber topicSubscriber = session.createDurableSubscriber(destination, "TopicSubscriber");
+        connection.start();
+        Message message = topicSubscriber.receive();
+        while (null != message) {
+            System.out.println("Receive Message..." + message);
+            message = topicSubscriber.receive(3000);
+        }
+        session.close();
+        connection.close();
+    }
+}
+```
 
 
 
+##### 事务
+
+在 Producer 中如果设置 事务为 true，那么发送 Message 的时候需要手动调用 commit。
+
+```java
+// 设置事务为 true
+Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+
+// 手动 commit
+session.commit();
+// 手动 rollback
+session.rollback();
+```
+
+在 Consumer 中如果设置事务为 true，那么接收 Message 后也需要手动调用 commit。
+
+```java
+// 设置事务为 true
+Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+
+// 手动 commit
+session.commit();
+// 手动 rollback
+session.rollback();
+```
+
+
+
+##### 签收
+
+主要有三种：自动签收（`Session.AUTO_ACKNOWLEDGE`）、手动签收（`Session.CLIENT_ACKNOWLEDGE`）、运行重复消息（`Session.DUPS_OK_ACKNOWLEDGE`），事务（`Session.SESSION_TRANSACTED`）
+
+```java
+// 设置手动签收
+Session session = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
+
+// 需要手动签收
+message.acknowledge();
+```
+
+在事务性会话中，当一个事务被成功提交则消息被自动签收，如果事务回滚，则消息会被再次传送。
+
+非事务性的会话中，消息何时被确认取决于创建会话的应答模式。
 
 
 
