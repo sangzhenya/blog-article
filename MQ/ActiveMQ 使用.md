@@ -1,4 +1,4 @@
-## ActiveMQ 整合
+## ActiveMQ 使用
 
 ### ActiveMQ Broker
 
@@ -218,6 +218,138 @@ public class QMessageListener implements MessageListener {
 
 
 ### ActiveMQ 与 SpringBoot
+
+在 SpringBoot 中使用 ActiveMQ
+
+`pom.xml` 中的依赖配置
+
+```java
+<dependencies>
+        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <version>2.2.0.RELEASE</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>2.2.0.RELEASE</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>2.2.0.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-activemq -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-activemq</artifactId>
+            <version>2.2.0.RELEASE</version>
+        </dependency>
+</dependencies>
+```
+
+`application.yml` 配置
+
+```xml
+server:
+  port: 8081
+spring:
+  activemq:
+    broker-url: tcp://localhost:61616
+    user: admin
+    password: admin
+  jms:
+    pub-sub-domain: false  # false:queue; true:topic
+
+queuename: DEMO.MQ.BOOT.TEST
+topicname: DEMO.MT.BOOT.TEST
+```
+
+Java 程序：
+
+```java
+// 主启动类
+@SpringBootApplication
+public class BootMQApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BootMQApplication.class);
+    }
+}
+
+// Config 类
+@Configuration
+@EnableJms
+@EnableScheduling
+public class MQConfig {
+    @Value("${queuename}")
+    private String queueName;
+    @Value("${topicname}")
+    private String topicName;
+
+    @Bean
+    public Queue queue() {
+        return new ActiveMQQueue(queueName);
+    }
+
+    @Bean
+    public Topic topic() {
+        return new ActiveMQTopic(topicName);
+    }
+}
+
+// 生产者类
+@Component(value = "qProducer")
+public class QProducer {
+    private final JmsMessagingTemplate jmsMessagingTemplate;
+    private final Queue queue;
+
+    public QProducer(JmsMessagingTemplate jmsMessagingTemplate, Queue queue) {
+        this.jmsMessagingTemplate = jmsMessagingTemplate;
+        this.queue = queue;
+    }
+
+    public void produce() {
+        jmsMessagingTemplate.convertAndSend(queue, "Demo Message");
+    }
+
+    @Scheduled(fixedDelay = 3000)
+    public void produceTask() {
+        jmsMessagingTemplate.convertAndSend(queue, "Demo Message Task");
+        System.out.println("Send message task done");
+    }
+}
+
+// 消费者类
+@Component(value = "qConsumer")
+public class QConsumer {
+    private final JmsMessagingTemplate jmsMessagingTemplate;
+    private final Queue queue;
+
+    public QConsumer(JmsMessagingTemplate jmsMessagingTemplate, Queue queue) {
+        this.jmsMessagingTemplate = jmsMessagingTemplate;
+        this.queue = queue;
+    }
+
+    @JmsListener(destination = "${queuename}")
+    public void consume(TextMessage textMessage) {
+        System.out.println("Receive TextMessage::" + textMessage);
+    }
+
+    public void consume() {
+        String message = jmsMessagingTemplate.receiveAndConvert(queue, String.class);
+        System.out.println("Receive TextMessage::" + message);
+    }
+}
+
+```
 
 
 
