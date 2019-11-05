@@ -76,7 +76,54 @@ RDB 备份可以做后备用途，建议在 Slave 上持久化 RDB 文件，而�
 
 ### Redis 事务
 
+Redis 事务可以一次性执行多个命令，即一组指令。一个事务中的所有命令都会序列化，按照顺序的串行化执行而不被其他命令插入。
+
+```shell
+# 取消事务
+discard
+# 执行事务
+exec
+# 标记事务开始
+multi
+# 取消 watch
+unwatch
+# 为 一个或多个 key 添加 watch，如果这些 key 被其他命令改动则事务被打断。
+watch key
+```
+
+三个特性：
+
+1. 单独的隔离操作：事务中的所有的命令都会序列化、按顺序的执行。事务执行的过程中，不会被其他客户端发送的命令请求所打断。
+2. 没有隔离级别：队列中的命令没有被提交之前不会有任何实际执行，不存在可见性的问题。
+3. 不保证原子性：Redis 一个事务中如果有一条命令执行是的，其他命令可能仍然被执行，没有回滚，例如 `incr` 指令失败。
+
 ### Redis 发布订阅
+
+进程之间的一种消息通讯模式：发送者发送消息，订阅者接收消息，订阅发布模式。
+
+```shell
+# 订阅一个或多个符合格式的频道
+PSUBSCRIBE pattern [pattern ...]
+# 查看订阅与发布系统状态
+PUBSUB subcommand [argument [argument ...]]
+# 将信息发送到指定的频道
+PUBLISH channel message
+# 退订所有给定模式的频道
+PUNSUBSCRIBE [pattern [pattern ...]]
+# 订阅给定的一个或多个频道的信息
+SUBSCRIBE channel [channel ...]
+# 指退订给定的频道
+UNSUBSCRIBE [channel [channel ...]]
+```
 
 ### Redis 主从复制
 
+主从复制 master/slaver 机制，master 以写为主，slave 以读为主。主要为了读写分离和容灾备份。
+
+主要配置从机 `slaveof 主IP 主端口` ，通过 `info replication` 命令查看状态。在一主多仆的情况下，默认主写，从读。如果是通过命令设置主从关系，主 down 之后其余角色不变，主重启之后关系恢复正常。从机 down 之后重启默认为 master 需要重新和主机连接。也可以通过 `slave no one` 命令停止与其他数据的同步转为主数据库。
+
+复制的具体原理是：Slave 启动成功连接 master 之后会发送 sync 命令，Master 接到命令后启动后台进程，同时收集所有接收到修改数据集的命令，在后台执行完毕后，master 将传送整个数据文件的 slave 完成一次完全的同步。Slave 服务在接收到数据文件后将其持久化并加载到内存中。Master 继续将新的所有收集到的修改命令依次传给 slave 完成同步，只要重新连接 master 都会进行一次完全的同步。
+
+#### 哨兵模式
+
+能够自动的监控主机否是故障，如果故障则根据投票数自动将从库转变为主库。增加 `sentinel.conf` 文件，在文件中添加 `sentinel monitor 主库名称  主IP  主端口 票数阈值`。然后通过 `redis-sentinel sentinel.conf` 启动哨兵。
