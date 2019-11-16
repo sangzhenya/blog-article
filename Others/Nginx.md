@@ -1,0 +1,51 @@
+## Nginx
+
+Nginx 是一个高性能的 HTTP 和反向代理服务器，占用内存少，并发能力强，可以作为静态页面的 Web 服务器，同时支持 CGI 协议的动态语言，例如 perl、php 等。但是不支持 Java，Java 程序只能通过 Tomcat 的配合完成。Nginx 专为性能优化开发，性能是其最重要的考量，非常注重效率，能够经受住高负载的考研。
+
+### 正向代理和反向代理
+
+Nginx 可以作为正向代理，例如在局域网中的电脑无法直接访问外部网络，而是通过一个代理服务器访问，这种代理服务就成为正向代理。
+
+![正向代理](http://img.sangzhenya.com/Snipaste_2019-11-16_16-02-25.png)
+
+Nginx 也可以作为反向代理，客户端对代理是无感知的，不需要任何配置就可以访问，只是请求会发送到反向服务器，由反向代理服务器选择目标服务器获取数据后，再返回给客户端，此时反向代理服务器和目标服务器对外就是一个服务器，暴露的是代理服务器的地址，因此真是真是服务器的地址。
+
+![反向代理]( http://img.sangzhenya.com/Snipaste_2019-11-16_16-05-31.png )
+
+### 负载均衡和动静分离
+
+客户端发送多个请求到服务器，服务器处理请求，一些数据可能与数据库进行交互，服务器处理完毕后再将结果返回给客户端。在高并发的情况下需要增加服务器的数量即服务器集群，Nginx 可以将负载分发到不同的服务器上即做负载均衡。
+
+![负载均衡]( http://img.sangzhenya.com/nginx/Snipaste_2019-11-16_16-17-19.png )
+
+为了加快网站的解析速度，可以把动态也忙额静态页面放在不同的服务器来解析，进而加快解析速度。降低单个服务器的压力。
+
+![动静分离]( http://img.sangzhenya.com/Snipaste_2019-11-16_16-19-15.png )
+
+### Nginx 安装与常用命令
+
+安装 PCRE 库： ` sudo apt-get install libpcre3 libpcre3-dev   `
+
+安装 zlib 库：` sudo apt-get install zlib1g-dev `
+
+安装 OpenSSL 库：` sudo apt-get install openssl libssl-dev  `
+
+下载 Nginx 并解压，依次运行 `./configure`  和 `make & make install`
+
+切换到 `/usr/local/nginx/sbin` 目录
+
+ `./nginx` 命令启动 nginx
+
+`./nginx -t` 测试配置文件是否正确
+
+ ` ./nginx -s reload` 重新加载
+
+` ./nginx -s stop` 关闭 nginx
+
+`ps -ef | grep nginx` 查看 nginx 是否成功启动
+
+或者使用 `sudo apt install nginx-full` 直接安装 nginx，使用这种方式安装的话，nginx 会在 `/etc` 目录下。
+
+### Nginx 配置文件
+
+`nginx.conf` 是 nginx 的配置文件。
