@@ -107,3 +107,326 @@ private static void registerBeanPostProcessors(
 
 **然后看一下 `AspectJAwareAdvisorAutoProxyCreator` 作为 `BeanPostProcessor` 执行的过程：**
 
+主要有两个方法：
+
+```java
+@Override
+public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
+    // 获取 cache key，正常来说就是 beanName
+    Object cacheKey = getCacheKey(beanClass, beanName);
+
+    if (!StringUtils.hasLength(beanName) || !this.targetSourcedBeans.contains(beanName)) {
+        /
+        if (this.advisedBeans.containsKey(cacheKey)) {
+            return null;
+        }
+        // 如果是PointCut, Advisor 等切面用的类则不需要代理
+        if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
+            this.advisedBeans.put(cacheKey, Boolean.FALSE);
+            return null;
+        }
+    }
+
+    // Create proxy here if we have a custom TargetSource.
+    // Suppresses unnecessary default instantiation of the target bean:
+    // The TargetSource will handle target instances in a custom fashion.
+    // 创建代理对象，首先尝试获取 Custom Traged Source
+    TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
+    // 如果获取到 targetSource 则去生成对应对象的代理对象
+    if (targetSource != null) {
+        if (StringUtils.hasLength(beanName)) {
+            this.targetSourcedBeans.add(beanName);
+        }
+        Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(beanClass, beanName, targetSource);
+        Object proxy = createProxy(beanClass, beanName, specificInterceptors, targetSource);
+        this.proxyTypes.put(cacheKey, proxy.getClass());
+        return proxy;
+    }
+
+    return null;
+}
+
+@Override
+public Object postProcessAfterInitialization(@Nullable Object bean, String beanName) {
+    if (bean != null) {
+        // 获取 cache key
+        Object cacheKey = getCacheKey(bean.getClass(), beanName);
+        if (this.earlyProxyReferences.remove(cacheKey) != bean) {
+            return wrapIfNecessary(bean, beanName, cacheKey);
+        }
+    }
+    return bean;
+}
+```
+
+第一个方法 `postProcessBeforeInstantiation` 是在每个容器实例化每个 Bean 之前调用，调用栈大致如下：
+
+容器调用 `refresh` 方法刷新，在其中调用 `beanFactory.preInstantiateSingletons` 方法去生成所有的被 Spring 管理的 Bean 对象，根据 Bean 定义信息首先调用 `getBean` 方法尝试从容器中获取 Bean，`getBean` 直接调用 `doGetBean` 获取，在其中调用 `getSingleton` 获取 Bean。在获取不到的情况使用 `createBean` 创建 Bean，在创建之前调用 `resolveBeforeInstantiation` 方法给 BeanProcessor 一个机会去返回目标对象的一个代理对象，其要实现 `InstantiationAwareBeanPostProcessor` 。
+
+```java
+@Nullable
+protected Object resolveBeforeInstantiation(String beanName, RootBeanDefinition mbd) {
+    Object bean = null;
+    if (!Boolean.FALSE.equals(mbd.beforeInstantiationResolved)) {
+        // Make sure bean class is actually resolved at this point.
+        if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+            Class<?> targetType = determineTargetType(beanName, mbd);
+            if (targetType != null) {
+                bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
+                if (bean != null) {
+                    bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+                }
+            }
+        }
+        mbd.beforeInstantiationResolved = (bean != null);
+    }
+    return bean;
+}
+
+@Nullable
+protected Object applyBeanPostProcessorsBeforeInstantiation(Class<?> beanClass, String beanName) {
+    for (BeanPostProcessor bp : getBeanPostProcessors()) {
+        if (bp instanceof InstantiationAwareBeanPostProcessor) {
+            InstantiationAwareBeanPostProcessor ibp = (InstantiationAwareBeanPostProcessor) bp;
+            Object result = ibp.postProcessBeforeInstantiation(beanClass, beanName);
+            if (result != null) {
+                return result;
+            }
+        }
+    }
+    return null;
+}
+
+@Override
+public Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName)
+    throws BeansException {
+
+    Object result = existingBean;
+    for (BeanPostProcessor processor : getBeanPostProcessors()) {
+        Object current = processor.postProcessAfterInitialization(result, beanName);
+        if (current == null) {
+            return result;
+        }
+        result = current;
+    }
+    return result;
+}
+```
+
+允许每个 Bean 后置处理器在 Bean 实例化之前和之后调用相应的方法，第一个方法也就是在这个时刻调用的。
+
+第二个方法是 `postProcessAfterInitialization` 在初始化之后调用。接着上面的方法，如果没有返回 Bean 实例的话，则会调用 `doCreateBean` 创建对象，在其中调用 `instanceWrapper.getWrappedInstance();`  去创建一个 Bean 包装实例，之后调用 `populateBean(beanName, mbd, instanceWrapper);` 为 Bean 设置相关的属性，之后调用 `initializeBean` 去调用 Bean 的初始化方法，和上面类似
+
+```java
+protected Object initializeBean(final String beanName, final Object bean, @Nullable RootBeanDefinition mbd) {
+    if (System.getSecurityManager() != null) {
+        AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+            invokeAwareMethods(beanName, bean);
+            return null;
+        }, getAccessControlContext());
+    }
+    else {
+        // 首先调用 Bean 的 Aware 方法为 Bean 设置一些相关的属性
+        invokeAwareMethods(beanName, bean);
+    }
+
+    Object wrappedBean = bean;
+    if (mbd == null || !mbd.isSynthetic()) {
+        // 遍历调用后置处理器的 postProcessBeforeInitialization 方法
+        wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
+    }
+
+    try {
+        // 调用初始化方法
+        invokeInitMethods(beanName, wrappedBean, mbd);
+    }
+    catch (Throwable ex) {
+        throw new BeanCreationException(
+            (mbd != null ? mbd.getResourceDescription() : null),
+            beanName, "Invocation of init method failed", ex);
+    }
+    if (mbd == null || !mbd.isSynthetic()) {
+        // 遍历调用后置处理器的 postProcessAfterInitialization 方法
+        wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+    }
+
+    return wrappedBean;
+}
+```
+
+在 `AspectJAwareAdvisorAutoProxyCreator` 的 `postProcessAfterInitialization` 中调用 `wrapIfNecessary` 包装 Bean，
+
+```java
+protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+    if (StringUtils.hasLength(beanName) && this.targetSourcedBeans.contains(beanName)) {
+        return bean;
+    }
+    if (Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))) {
+        return bean;
+    }
+    if (isInfrastructureClass(bean.getClass()) || shouldSkip(bean.getClass(), beanName)) {
+        this.advisedBeans.put(cacheKey, Boolean.FALSE);
+        return bean;
+    }
+	
+    // Create proxy if we have advice.
+    // 判断是否有 advisors，如果有才创建代理
+    Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+    if (specificInterceptors != DO_NOT_PROXY) {
+        // 经过上面的校验，如果能够到达此处，则开始创建包装对象代理
+        this.advisedBeans.put(cacheKey, Boolean.TRUE);
+        // 创建代理
+        Object proxy = createProxy(
+            bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+        this.proxyTypes.put(cacheKey, proxy.getClass());
+        return proxy;
+    }
+
+    this.advisedBeans.put(cacheKey, Boolean.FALSE);
+    return bean;
+}
+
+@Override
+@Nullable
+protected Object[] getAdvicesAndAdvisorsForBean(
+    Class<?> beanClass, String beanName, @Nullable TargetSource targetSource) {
+    // 获取 Bean 的advisors
+    List<Advisor> advisors = findEligibleAdvisors(beanClass, beanName);
+    if (advisors.isEmpty()) {
+        return DO_NOT_PROXY;
+    }
+    return advisors.toArray();
+}
+
+// 创建代理
+protected Object createProxy(Class<?> beanClass, @Nullable String beanName,
+			@Nullable Object[] specificInterceptors, TargetSource targetSource) {
+
+    if (this.beanFactory instanceof ConfigurableListableBeanFactory) {
+        // 暴露 TargetClass，将 target class 放到标签中 
+        AutoProxyUtils.exposeTargetClass((ConfigurableListableBeanFactory) this.beanFactory, beanName, beanClass);
+    }
+
+    ProxyFactory proxyFactory = new ProxyFactory();
+    proxyFactory.copyFrom(this);
+
+    if (!proxyFactory.isProxyTargetClass()) {
+        // 直接代理类
+        if (shouldProxyTargetClass(beanClass, beanName)) {
+            proxyFactory.setProxyTargetClass(true);
+        }
+        else {
+            // 尝试代理接口
+            evaluateProxyInterfaces(beanClass, proxyFactory);
+        }
+    }
+
+    // 感觉 Bean 名称和特定的拦截器去生成 Advisor
+    Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+    // 代理工厂设置 Advisor
+    proxyFactory.addAdvisors(advisors);
+    // 代理工厂设置目标类
+    proxyFactory.setTargetSource(targetSource);
+    customizeProxyFactory(proxyFactory);
+
+    proxyFactory.setFrozen(this.freezeProxy);
+    if (advisorsPreFiltered()) {
+        proxyFactory.setPreFiltered(true);
+    }
+
+    return proxyFactory.getProxy(getProxyClassLoader());
+}
+
+protected void evaluateProxyInterfaces(Class<?> beanClass, ProxyFactory proxyFactory) {
+    // 获取接口
+    Class<?>[] targetInterfaces = ClassUtils.getAllInterfacesForClass(beanClass, getProxyClassLoader());
+    boolean hasReasonableProxyInterface = false;
+    for (Class<?> ifc : targetInterfaces) {
+        if (!isConfigurationCallbackInterface(ifc) && !isInternalLanguageInterface(ifc) &&
+            ifc.getMethods().length > 0) {
+            hasReasonableProxyInterface = true;
+            break;
+        }
+    }
+    // 判断是否有可用的代理接口
+    if (hasReasonableProxyInterface) {
+        // Must allow for introductions; can't just set interfaces to the target's interfaces only.
+        for (Class<?> ifc : targetInterfaces) {
+            proxyFactory.addInterface(ifc);
+        }
+    }
+    else {
+        // 直接代理类
+        proxyFactory.setProxyTargetClass(true);
+    }
+}
+
+// 获取代理
+public Object getProxy(@Nullable ClassLoader classLoader) {
+    // 创建代理，如果是接口可以直接使用 JDK 的代理，否则使用 CGLIB 创建代理
+    return createAopProxy().getProxy(classLoader);
+}
+
+// 使用 CGLIB 创建代理
+@Override
+public Object getProxy(@Nullable ClassLoader classLoader) {
+    if (logger.isTraceEnabled()) {
+        logger.trace("Creating CGLIB proxy: " + this.advised.getTargetSource());
+    }
+
+    try {
+        Class<?> rootClass = this.advised.getTargetClass();
+        Assert.state(rootClass != null, "Target class must be available for creating a CGLIB proxy");
+
+        Class<?> proxySuperClass = rootClass;
+        if (rootClass.getName().contains(ClassUtils.CGLIB_CLASS_SEPARATOR)) {
+            proxySuperClass = rootClass.getSuperclass();
+            Class<?>[] additionalInterfaces = rootClass.getInterfaces();
+            for (Class<?> additionalInterface : additionalInterfaces) {
+                this.advised.addInterface(additionalInterface);
+            }
+        }
+
+        // Validate the class, writing log messages as necessary.
+        validateClassIfNecessary(proxySuperClass, classLoader);
+
+        // Configure CGLIB Enhancer...
+        Enhancer enhancer = createEnhancer();
+        if (classLoader != null) {
+            enhancer.setClassLoader(classLoader);
+            if (classLoader instanceof SmartClassLoader &&
+                ((SmartClassLoader) classLoader).isClassReloadable(proxySuperClass)) {
+                enhancer.setUseCache(false);
+            }
+        }
+        enhancer.setSuperclass(proxySuperClass);
+        enhancer.setInterfaces(AopProxyUtils.completeProxiedInterfaces(this.advised));
+        enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
+        enhancer.setStrategy(new ClassLoaderAwareGeneratorStrategy(classLoader));
+
+        Callback[] callbacks = getCallbacks(rootClass);
+        Class<?>[] types = new Class<?>[callbacks.length];
+        for (int x = 0; x < types.length; x++) {
+            types[x] = callbacks[x].getClass();
+        }
+        // fixedInterceptorMap only populated at this point, after getCallbacks call above
+        enhancer.setCallbackFilter(new ProxyCallbackFilter(
+            this.advised.getConfigurationOnlyCopy(), this.fixedInterceptorMap, this.fixedInterceptorOffset));
+        enhancer.setCallbackTypes(types);
+
+        // Generate the proxy class and create a proxy instance.
+        return createProxyClassAndInstance(enhancer, callbacks);
+    }
+    catch (CodeGenerationException | IllegalArgumentException ex) {
+        throw new AopConfigException("Could not generate CGLIB subclass of " + this.advised.getTargetClass() +
+                                     ": Common causes of this problem include using a final class or a non-visible class",
+                                     ex);
+    }
+    catch (Throwable ex) {
+        // TargetSource.getTarget() failed
+        throw new AopConfigException("Unexpected AOP exception", ex);
+    }
+}
+```
+
+至此所有的两个主要方法就执行完毕了，也就生成了对应的代理对象了。
