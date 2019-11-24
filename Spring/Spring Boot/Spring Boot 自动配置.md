@@ -54,11 +54,9 @@ public @interface EnableAutoConfiguration {
 public @interface AutoConfigurationPackage {
 ```
 
-通过 `AutoConfigurationImportSelector` 为容器中注入 Bean，最终通过其内部类 `AutoConfigurationGroup` 的 `selectImports` 为容器中导入 Bean。用于导入预设的所有 AutoConfiguration 的类并进行自动配置。
+通过 `AutoConfigurationImportSelector` 为容器中注入 Bean，最终通过其内部类 `AutoConfigurationGroup` 的 `selectImports` 为容器中导入 Bean。用于导入预设的所有 AutoConfiguration 的类并进行自动配置。会从 `spring.factories` 文件中获取 `EnableAutoConfiguration` 的值作为自动配置类导入到容器中， AutoConfiguration 类的元信息定义在 `spring-autoconfigure-metadata.properties` 文件中。
 
-Spring Boot 启动的时候会从 `spring.factories` 文件中获取 `EnableAutoConfiguration` 的值作为自动配置类导入到容器中，
-
- AutoConfiguration 类的全路径定义在 `spring-autoconfigure-metadata.properties` 文件中。
+==ToDo:  增加调用流程==
 
 ```java
 // AutoConfigurationImportSelector.AutoConfigurationGroup#selectImports
@@ -128,3 +126,81 @@ public static void register(BeanDefinitionRegistry registry, String... packageNa
 ```
 
 ![元信息]( http://img.sangzhenya.com/Snipaste_2019-11-24_19-09-16.png )
+
+上面已经知道自动配置主要是依赖于启动的时候导入的 AutoConfiguration 类，下面分析以下 AutoConfiguration 的流程，以 `HttpEncodingAutoConfiguration` 为例：
+
+```java
+// 标注配置类
+@Configuration(proxyBeanMethods = false)
+// 启动 Configuration Properties 功能，即启动 HttpProperties 从 properties 中取值和 Bean 属性绑定
+@EnableConfigurationProperties(HttpProperties.class)
+// 启动该配置的条件 Web 环境，有 CharacterEncodingFilter 类，
+// 无 spring.http.encoding.enabled 或值为 true
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnClass(CharacterEncodingFilter.class)
+@ConditionalOnProperty(prefix = "spring.http.encoding", value = "enabled", matchIfMissing = true)
+public class HttpEncodingAutoConfiguration {
+
+    // 获取属性值
+	private final HttpProperties.Encoding properties;
+
+	public HttpEncodingAutoConfiguration(HttpProperties properties) {
+		this.properties = properties.getEncoding();
+	}
+
+    // 给容器中添加一个 CharacterEncodingFilter Bean
+	@Bean
+    // 只有在容器中没有该 Bean 的时候才会添加
+	@ConditionalOnMissingBean
+	public CharacterEncodingFilter characterEncodingFilter() {
+		CharacterEncodingFilter filter = new OrderedCharacterEncodingFilter();
+        // 从 properties 中获取值
+		filter.setEncoding(this.properties.getCharset().name());
+		filter.setForceRequestEncoding(this.properties.shouldForce(Type.REQUEST));
+		filter.setForceResponseEncoding(this.properties.shouldForce(Type.RESPONSE));
+		return filter;
+	}
+
+    // 为容器添加 LocaleCharsetMappingsCustomizer Bean
+    // 用于帮助使用者自定义 Configuration
+	@Bean
+	public LocaleCharsetMappingsCustomizer localeCharsetMappingsCustomizer() {
+		return new LocaleCharsetMappingsCustomizer(this.properties);
+	}
+
+	private static class LocaleCharsetMappingsCustomizer
+			implements WebServerFactoryCustomizer<ConfigurableServletWebServerFactory>, Ordered {
+
+		private final HttpProperties.Encoding properties;
+
+		LocaleCharsetMappingsCustomizer(HttpProperties.Encoding properties) {
+			this.properties = properties;
+		}
+
+		@Override
+		public void customize(ConfigurableServletWebServerFactory factory) {
+			if (this.properties.getMapping() != null) {
+				factory.setLocaleCharsetMappings(this.properties.getMapping());
+			}
+		}
+
+		@Override
+		public int getOrder() {
+			return 0;
+		}
+
+	}
+
+}
+```
+
+```java
+// 配置的开头都是以 spring.http 开头
+@ConfigurationProperties(prefix = "spring.http")
+public class HttpProperties {
+    private boolean logRequestDetails;
+    public static class Encoding {
+
+		public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+```
+
