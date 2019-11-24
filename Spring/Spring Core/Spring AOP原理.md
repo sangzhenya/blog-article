@@ -12,6 +12,18 @@ public class LogAspects {
     public void pointCut() {}
 ```
 
+被切入的 Message 类如下：
+
+```java
+@Component
+public class MyMessage {
+    public int sayHello(int count) {
+        System.out.println("Hello World::" + count);
+        return count + 1;
+    }
+}
+```
+
 具体 Spring 实现 AOP 的原理如下：
 
 `@EnableAspectJAutoProxy` 注解中引入了 `AspectJAutoProxyRegistrar` 类，其实现了 `ImportBeanDefinitionRegistrar` 接口，在 `registerBeanDefinitions()` 方法中为容器引入 `AnnotationAwareAspectJAutoProxyCreator` 类。
@@ -430,3 +442,279 @@ public Object getProxy(@Nullable ClassLoader classLoader) {
 ```
 
 至此所有的两个主要方法就执行完毕了，也就生成了对应的代理对象了。
+
+**下面看一下调用方法时候的处理流程：**
+
+例如调用 `Message.sayHello` 方法，在获取到 Bean 的时候发现已经是代理之后的对象了 ，如下图所示:
+
+![被代理的对象]( http://img.sangzhenya.com/Snipaste_2019-11-21_23-18-48.png )
+
+首先是 `CglibAopProxy.DynamicAdvisedInterceptor` 中的 `intercept ` 方法
+
+```java
+@Override
+@Nullable
+public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
+    Object oldProxy = null;
+    boolean setProxyContext = false;
+    Object target = null;
+    TargetSource targetSource = this.advised.getTargetSource();
+    try {
+        if (this.advised.exposeProxy) {
+            // Make invocation available if necessary.
+            oldProxy = AopContext.setCurrentProxy(proxy);
+            setProxyContext = true;
+        }
+        // Get as late as possible to minimize the time we "own" the target, in case it comes from a pool...
+        // 获取被代理的类
+        target = targetSource.getTarget();
+        Class<?> targetClass = (target != null ? target.getClass() : null);
+        // 从 advised 中获取目标方法的拦截器链
+        List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+        Object retVal;
+        // Check whether we only have one InvokerInterceptor: that is,
+        // no real advice, but just reflective invocation of the target.
+        if (chain.isEmpty() && Modifier.isPublic(method.getModifiers())) {
+            // We can skip creating a MethodInvocation: just invoke the target directly.
+            // Note that the final invoker must be an InvokerInterceptor, so we know
+            // it does nothing but a reflective operation on the target, and no hot
+            // swapping or fancy proxying.
+            // 如果没有任何拦截，则直接调用返回
+            Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
+            retVal = methodProxy.invoke(target, argsToUse);
+        }
+        else {
+            // We need to create a method invocation...
+            // 创建 CglibMethodInvocation 并调用 proceed 处理
+            retVal = new CglibMethodInvocation(proxy, target, method, args, targetClass, chain, methodProxy).proceed();
+        }
+        retVal = processReturnType(proxy, target, method, retVal);
+        return retVal;
+    }
+    finally {
+        if (target != null && !targetSource.isStatic()) {
+            targetSource.releaseTarget(target);
+        }
+        if (setProxyContext) {
+            // Restore old proxy.
+            AopContext.setCurrentProxy(oldProxy);
+        }
+    }
+}
+```
+
+上图中获取的拦截器链如下，其实就是定义的切面方法。
+
+![拦截链]( http://img.sangzhenya.com/Snipaste_2019-11-23_12-17-05.png )
+
+获取拦截器链的方法如下：
+```java
+public List<Object> getInterceptorsAndDynamicInterceptionAdvice(Method method, @Nullable Class<?> targetClass) {
+    // 生成 cachkey key
+    MethodCacheKey cacheKey = new MethodCacheKey(method);
+    // 获取 cachkey
+    List<Object> cached = this.methodCache.get(cacheKey);
+    if (cached == null) {
+        // 如果 cache 为空则去获取
+        cached = this.advisorChainFactory.getInterceptorsAndDynamicInterceptionAdvice(
+            this, method, targetClass);
+        this.methodCache.put(cacheKey, cached);
+    }
+    return cached;
+}
+```
+
+```java
+@Override
+public List<Object> getInterceptorsAndDynamicInterceptionAdvice(
+    Advised config, Method method, @Nullable Class<?> targetClass) {
+
+    // This is somewhat tricky... We have to process introductions first,
+    // but we need to preserve order in the ultimate list.
+    AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();
+    // 获取到类的 advisor
+    Advisor[] advisors = config.getAdvisors();
+    // 保存所有拦截器
+    List<Object> interceptorList = new ArrayList<>(advisors.length);
+    Class<?> actualClass = (targetClass != null ? targetClass : method.getDeclaringClass());
+    Boolean hasIntroductions = null;
+
+    // 遍历增强器集合过滤生成 method 对应的 拦截器链
+    for (Advisor advisor : advisors) {
+        if (advisor instanceof PointcutAdvisor) {
+            // Add it conditionally.
+            PointcutAdvisor pointcutAdvisor = (PointcutAdvisor) advisor;
+            if (config.isPreFiltered() || pointcutAdvisor.getPointcut().getClassFilter().matches(actualClass)) {
+                // 获取 Method Matcher 并进行 Match
+                MethodMatcher mm = pointcutAdvisor.getPointcut().getMethodMatcher();
+                boolean match;
+                if (mm instanceof IntroductionAwareMethodMatcher) {
+                    if (hasIntroductions == null) {
+                        hasIntroductions = hasMatchingIntroductions(advisors, actualClass);
+                    }
+                    match = ((IntroductionAwareMethodMatcher) mm).matches(method, actualClass, hasIntroductions);
+                }
+                else {
+                    match = mm.matches(method, actualClass);
+                }
+                // 如果 match，则将 增强器转换成 MethodInterceptor
+                if (match) {
+                    MethodInterceptor[] interceptors = registry.getInterceptors(advisor);
+                    if (mm.isRuntime()) {
+                        // Creating a new object instance in the getInterceptors() method
+                        // isn't a problem as we normally cache created chains.
+                        for (MethodInterceptor interceptor : interceptors) {
+                            interceptorList.add(new InterceptorAndDynamicMethodMatcher(interceptor, mm));
+                        }
+                    }
+                    else {
+                        interceptorList.addAll(Arrays.asList(interceptors));
+                    }
+                }
+            }
+        }
+        else if (advisor instanceof IntroductionAdvisor) {
+            IntroductionAdvisor ia = (IntroductionAdvisor) advisor;
+            if (config.isPreFiltered() || ia.getClassFilter().matches(actualClass)) {
+                Interceptor[] interceptors = registry.getInterceptors(advisor);
+                interceptorList.addAll(Arrays.asList(interceptors));
+            }
+        }
+        else {
+            Interceptor[] interceptors = registry.getInterceptors(advisor);
+            interceptorList.addAll(Arrays.asList(interceptors));
+        }
+    }
+
+    return interceptorList;
+}
+```
+
+
+
+```java
+// 根据 Advisor 生成 MethodInterceptor
+@Override
+public MethodInterceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
+    List<MethodInterceptor> interceptors = new ArrayList<>(3);
+    Advice advice = advisor.getAdvice();
+    // 直接生成
+    if (advice instanceof MethodInterceptor) {
+        interceptors.add((MethodInterceptor) advice);
+    }
+    // 通过适配器生成
+    for (AdvisorAdapter adapter : this.adapters) {
+        if (adapter.supportsAdvice(advice)) {
+            interceptors.add(adapter.getInterceptor(advisor));
+        }
+    }
+    if (interceptors.isEmpty()) {
+        throw new UnknownAdviceTypeException(advisor.getAdvice());
+    }
+    return interceptors.toArray(new MethodInterceptor[0]);
+}
+```
+
+得到拦截器链之后就可以根据拦截器链去执行方法了，下面是 `proceed` 方法的流程
+
+```java
+@Override
+@Nullable
+public Object proceed() throws Throwable {
+    // We start with an index of -1 and increment early.
+    // 递归调用，从 -1 开始递增
+    if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+        return invokeJoinpoint();
+    }
+
+    // 获取当前的拦截器
+    Object interceptorOrInterceptionAdvice =
+        this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+    if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
+        // Evaluate dynamic method matcher here: static part will already have
+        // been evaluated and found to match.
+        InterceptorAndDynamicMethodMatcher dm =
+            (InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
+        Class<?> targetClass = (this.targetClass != null ? this.targetClass : this.method.getDeclaringClass());
+        if (dm.methodMatcher.matches(this.method, targetClass, this.arguments)) {
+            return dm.interceptor.invoke(this);
+        }
+        else {
+            // Dynamic matching failed.
+            // Skip this interceptor and invoke the next in the chain.
+            return proceed();
+        }
+    }
+    else {
+        // It's an interceptor, so we just invoke it: The pointcut will have
+        // been evaluated statically before this object was constructed.
+        // 调用拦截器的 invoke，递归调用
+        return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+    }
+}
+```
+
+有 5 种 `Interceptor ` 如下所示：
+
+```java
+// MethodBeforeAdviceInterceptor
+@Override
+public Object invoke(MethodInvocation mi) throws Throwable {
+    this.advice.before(mi.getMethod(), mi.getArguments(), mi.getThis());
+    return mi.proceed();
+}
+```
+
+```java
+// AspectJAfterAdvice
+@Override
+public Object invoke(MethodInvocation mi) throws Throwable {
+    try {
+        return mi.proceed();
+    }
+    finally {
+        invokeAdviceMethod(getJoinPointMatch(), null, null);
+    }
+}
+```
+
+```java
+// AfterReturningAdviceInterceptor
+@Override
+public Object invoke(MethodInvocation mi) throws Throwable {
+    Object retVal = mi.proceed();
+    this.advice.afterReturning(retVal, mi.getMethod(), mi.getArguments(), mi.getThis());
+    return retVal;
+}
+```
+
+```java
+// AspectJAfterThrowingAdvice
+@Override
+public Object invoke(MethodInvocation mi) throws Throwable {
+    try {
+        return mi.proceed();
+    }
+    catch (Throwable ex) {
+        if (shouldInvokeOnThrowing(ex)) {
+            invokeAdviceMethod(getJoinPointMatch(), null, ex);
+        }
+        throw ex;
+    }
+}
+```
+
+```java
+// AspectJAroundAdvice
+@Override
+public Object invoke(MethodInvocation mi) throws Throwable {
+    if (!(mi instanceof ProxyMethodInvocation)) {
+        throw new IllegalStateException("MethodInvocation is not a Spring ProxyMethodInvocation: " + mi);
+    }
+    ProxyMethodInvocation pmi = (ProxyMethodInvocation) mi;
+    ProceedingJoinPoint pjp = lazyGetProceedingJoinPoint(pmi);
+    JoinPointMatch jpm = getJoinPointMatch(pmi);
+    return invokeAdviceMethod(pjp, jpm, null, null);
+}
+```
+
