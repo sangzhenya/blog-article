@@ -89,7 +89,6 @@ protected void service(HttpServletRequest req, HttpServletResponse resp) throws 
 ```
 
 
-
 ### Filter
 
 Filter 和 Servlet 有些相似，其主要负责过滤请求，在请求进入到 Servlet 之前判断是否满足限定条件，可以拦截进入 Servlet。其生命周期同样是四个阶段，1 调用构造器创建，2 调用 init 方法初始化，3 调用 doFilter 方法完成过滤功能，4 服务终止，调用 destory 方法。在 `web.xml` 中配置解决乱码的 filter 如下：
@@ -115,7 +114,13 @@ Filter 和 Servlet 有些相似，其主要负责过滤请求，在请求进入�
 </filter-mapping>
 ```
 
-
+此外 Filter 默认只会拦截直接发送到目标资源的请求，而转发的请求不会拦截，如果需要拦截则需要手动配置拦截方式，总共有以下四种：
+```xml
+<dispatcher>REQUEST</dispatcher> 
+<dispatcher>FORWARD</dispatcher>  
+<dispatcher>INCLUDE</dispatcher>  
+<dispatcher>ERROR</dispatcher>
+```
 
 ### Listener
 
@@ -146,3 +151,58 @@ Listener 即监听器，可以用来监听Application、Session、Request对象�
    `ServletRequestListener` ：主要有两个方法  `requestInitialized` ，`requestDestroyed`。分别在创建 `ServletRequest` 的时候调用
 
    `ServletRequestAttributeListener`：主要有三个方法 `attributeAdded`， `attributeReplaced`， `attributeRemoved`。分别在添加属性，修改属性和删除属性的时候调用。
+
+### 使用注解
+
+此外如果使用 Servlet 3.0 及以上同样可以不用 `web.xml`, 而是直接通过注解的方法是注册三大组件。下面是一个简单通过注解实现 Servlet 的例子：
+```java
+// 使用@WebServlet 标注当前是一个 Servlet 
+// 其值是需要拦截的 URL
+@WebServlet("/hello")
+public class MyServlet extends HttpServlet {
+    // 服务端方法
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.getWriter().write("Hello World");
+    }
+}
+```
+同样的方法可以使用 `@WebFilter` 和 `@WebListener` 注册 Filter 和 Listener。
+
+### 共享库和运行时插件
+在 Servlet 3.0 中同时提供了一个机制是，Servlet 容器启动的时候会去扫描当前应用的每一个 Jar 包，查看类数据下 `META-INF/services/javax.servlet.ServletContainerInitializer` 文件中的内容，根据全类名找到所有 `ServletContainerInitializer` 子类并执行 `onStartup` 方法。
+```java
+// 感兴趣的类或接口
+@HandlesTypes(value = {MyService.class})
+public class MyServletContainerInitializer implements ServletContainerInitializer {
+  // 参数 1 就是上面注解感兴趣类或接口的子接口或实现类的集合
+    @Override
+  public void onStartup(Set<Class<?>> c, ServletContext ctx) throws ServletException {
+        System.out.println("**************************************************");
+        System.out.println(c);
+        System.out.println("**************************************************");
+    }
+}
+```
+启动后打印日志如下：
+```log
+**************************************************
+[class com.xinyue.myservlet.MyServiceImpl]
+**************************************************
+```
+
+此外发现 `MyServletContainerInitializer` 中 `onStartup` 是 `ServletContext` 也就意味着可以在这个方法中动态的添加 Web 的三大组件。如下所示动态的为 Servlet Context 添加一个 Servlet。
+```java
+public class DemoServlet extends HttpServlet {
+    @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.getWriter().write("Demo World");
+    }
+}
+```
+在 `onStartup` 中添加。
+```java
+ServletRegistration.Dynamic demoServlet = ctx.addServlet("demo", new DemoServlet());
+        demoServlet.addMapping("/demo");
+```
+当然在 `ServletContextListener` 的 `contextInitialized` 方法中也可以通过 `ServletContext servletContext = sce.getServletContext()` 获取到 `ServletContext`  进而动态的向 `ServletContext` 中添加组件。
