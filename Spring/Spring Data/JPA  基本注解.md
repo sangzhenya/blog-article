@@ -124,3 +124,45 @@ public class MyJpa {
 
 ![数据库结果](http://img.sangzhenya.com/Snipaste_2019-12-21_10-48-28.png)
 
+在 Book 这个实体类中可以看到几个相关的注解：
+
+首先是 `@Entity` 表明这是一个实体类，如果类名称和表名称不一致，可以通过设置 name 属性来修改该类对应的表名称。
+
+然后是 `@Id` 标注用于声明一个实体类的属性映射为数据库的主键列，可以放在 `getter` 方法上。
+
+在制定了主键之后需要说明生成主键的策略，使用 `@GeneratedValue` 方式标注数据生成的方式，通过 `strategy` 属性制定生成的策略，主要有以下几种：
+
+1. `IDENTITY`  采用数据库 ID 自增长的方案。
+2. `AUTO` 默认选项，JPA 自动生成合适的策略，Oracle 不支持这种方式。
+3. `SEQUENCE` 通过序列生成主键，通过 `@SequenceGenerator` 注解制定序列名称，MySQL 不支持这种方式。
+4. `TABLE` 通过表产生主键，框架借由表模拟序列产生注解，使用该策略时数据库移植更为方便。
+
+然后是 `@Basic` 是一个默认注解，表示一个属性到数据库表的字段映射，对于没有任何标注的 getter 方法默认即为 `@Basic` 注解。其有 `fetch` 和 `optional` 两个属性，其中 `fetch` 表示该属性的读取策略有两种选择 `FetchType.EAGER` 和 `FetchType.LAZY` 前者表示及时获取后者表示延时加载。默认是 `EAGER`。`optional`注解表示该属性是否可以为 `null` 默认是  `true`。
+
+然后是 `@Column` 可以通过其 `name` 属性将类属性 mapping 到数据库字段上。也可以设置 `unique`， `nullable`，`length` 等属性。此外对于 Java 数据类型和 数据库数据类型不一致的情况可以使用 `columnDefinition` 属性进行指定，例如指定 String 类型字段为 varchar 或者 text，`columnDefinition = "text"`。
+
+然后是 `@Transient` 表示该属性并非一个数据库表字段，ORM 框架忽略该属性。
+
+然后是 `@Temporal` 用于区分设置日期和时间的。例如 `TemporalType.TIMESTAMP`， `TemporalType.DATE` 等。
+
+然后是 `@TableGenerator` 注解，如果主键生成策略时 Table `@GeneratedValue(strategy = GenerationType.TABLE, generator = "ID_GENERATOR")` 那么需要设置对应的 Table Generator。
+
+```java
+@TableGenerator(
+  // 生成器名称
+  name = "ID_GENERATOR",
+  // 对应的表
+  table = "JPA_ID_GENERATOR",
+  // 每次增长多少
+  allocationSize = 1,
+  // 初始值是多少
+  initialValue = 1,
+  // 存储序列的列
+  pkColumnName = "PK_NAME",
+  // 存储序列的 value
+  pkColumnValue = "BOOK",
+  // 当前 ID 值的列
+  valueColumnName = "ID_VAL"
+)
+```
+
