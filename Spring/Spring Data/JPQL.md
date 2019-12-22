@@ -31,9 +31,30 @@ JPA 同样可以设置二级缓存，在 `pom.xml` 中添加依赖如下：
 在 `persistence-unit` 中添加属性：
 
 ```xml
-<property name="hibernate.cache.use_second_level_cache" value="true"/>
-<property name="hibernate.cache.region.factory_class" value="org.hibernate.cache.ehcache.internal.EhcacheRegionFactory"/>
-<property name="hibernate.cache.use_query_cache" value="true"/>
+ <!--
+            配置耳机缓存策略：
+            ALL: 所有实体类都被缓存
+            NONE: 所有实体类都不会被缓存
+            ENABLE_SELECTIVE：标识了 @Cacheable(true) 被缓存
+            DISABLE_SELECTIVE: 除了标识  @Cacheable(true) 被缓存
+            UNSPECIFIED: 默认值
+-->
+<shared-cache-mode>UNSPECIFIED</shared-cache-mode>
+
+<properties>
+  <property name="hibernate.connection.url" value="jdbc:mysql:///xinyue"/>
+  <property name="hibernate.connection.driver_class" value="com.mysql.jdbc.Driver"/>
+  <property name="hibernate.connection.username" value="root"/>
+  <property name="hibernate.connection.password" value="36003981D"/>
+  <property name="hibernate.archive.autodetection" value="class"/>
+  <property name="hibernate.show_sql" value="true"/>
+  <property name="hibernate.format_sql" value="true"/>
+  <property name="hibernate.hbm2ddl.auto" value="update"/>
+
+  <property name="hibernate.cache.use_second_level_cache" value="true"/>
+  <property name="hibernate.cache.region.factory_class" value="org.hibernate.cache.ehcache.internal.EhcacheRegionFactory"/>
+  <property name="hibernate.cache.use_query_cache" value="true"/>
+</properties>
 ```
 
 Select 语句用来执行查询，其语法可以表示为：`SELECT FROM [WHERE] [GROUP BY] [HAVING] [ORDER BY]` 的形式。
