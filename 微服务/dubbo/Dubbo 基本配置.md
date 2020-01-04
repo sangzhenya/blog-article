@@ -142,11 +142,143 @@ boolean isProviderSide = RpcContext.getContext().isProviderSide();
 
 **Provider 和 Comsumer 异步调用**
 
+在 Dubbo 2.7 开始 Dubbo 所以异步编程接口使用 `CompletableFuture` 为基础，基于 NIO 的非阻塞实现并行调用，客户端不需要启动过线程既可以并行调用多个远程服务，相对线程开销较小。
+
+![Consumer 异步调用](http://img.programya.com/20200104094148.png)
+
+Provider 段异步执行的业务从 Dubbo 内部线程切换到业务自定义线程，避免 Dubbo 线程池的过度使用，有助用避免不同服务之间的相互影响。此外 Provider 端的异步执行和 Consumer 端的异步调用时相互独立的，可以任意正交组合两端的配置。
+
+```java
+// 接口
+public interface AsyncService {
+    CompletableFuture<String> sayHello(String name);
+}
+// Provider 实现
+public class AsyncServiceImpl implements AsyncService {
+    @Override
+    public CompletableFuture<String> sayHello(String name) {
+        RpcContext savedContext = RpcContext.getContext();
+        // 建议为supplyAsync提供自定义线程池，避免使用JDK公用线程池
+        return CompletableFuture.supplyAsync(() -> {
+            System.out.println(savedContext.getAttachment("consumer-key1"));
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "async response from provider.";
+        });
+    }
+}
+
+// Consumer 实现
+@Reference(timeout = 1000)
+AsyncService asyncService;
+@GetMapping("/async")
+public String async() {
+  // 调用直接返回CompletableFuture
+  CompletableFuture<String> future = asyncService.sayHello("async call request");
+  // 增加回调
+  future.whenComplete((v, t) -> {
+    if (t != null) {
+      t.printStackTrace();
+    } else {
+      System.out.println("Response: " + v);
+    }
+  });
+  // 早于结果输出
+  System.out.println("Executed before response return.");
+  return "Success";
+}
+```
+
 **参数回调**
+
+参数回调的方式与调用本地 `callback` 或 `listener` 相同，只需要在配置文件中声明哪个参数是 callback 类型即可。Dubbo 将基于长连接生成反向代理，这样就可以从服务端调用客户端的逻辑。
+
+```java
+// callback listener
+public interface CallbackListener {
+    void changed(String msg);
+}
+// callback service
+public interface CallbackService {
+    void addListener(String key, CallbackListener listener);
+}
+// provider
+@Service
+public class CallbackServiceImpl implements CallbackService {
+    private final Map<String, CallbackListener> listeners = new ConcurrentHashMap<>();
+
+    public CallbackServiceImpl() {
+        Thread t = new Thread(() -> {
+            while(true) {
+                try {
+                    for(Map.Entry<String, CallbackListener> entry : listeners.entrySet()){
+                        try {
+                            entry.getValue().changed(getChanged(entry.getKey()));
+                        } catch (Throwable t1) {
+                            listeners.remove(entry.getKey());
+                        }
+                    }
+                    Thread.sleep(5000); // 定时触发变更通知
+                } catch (Throwable t1) { // 防御容错
+                    t1.printStackTrace();
+                }
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+
+    public void addListener(String key, CallbackListener listener) {
+        listeners.put(key, listener);
+        listener.changed(getChanged(key)); // 发送变更通知
+    }
+
+    private String getChanged(String key) {
+        return "Changed: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+    }
+}
+
+// consumer
+@Reference(methods = {@Method(name = "addListener", arguments = {@Argument(index = 1, callback = true)})})
+CallbackService callbackService;
+@GetMapping("/callback")
+public String callback() {
+  callbackService.addListener("foo.bar", msg -> System.out.println("callback1:" + msg));
+  return "success";
+}
+
+```
 
 **本地存根**
 
+想要在客户端执行部分逻辑，例如使用 `ThreadLocal` 缓存，提前验证参数，调用失败后伪造容错数据等，需要在 API 上加上 Stub，客户端生成 Proxy 实例，会把 Proxy 通过构造函数传给 Stub，然后把 Stub 暴露给用户，Stub 可以决定要不要去调用 Proxy。入下图所示：
 
+![Stub](http://img.programya.com/20200104091152.png)
+
+```java
+@Reference(stub = "com.xinyue.dubbo.consumer.controller.ArticleServiceStub")
+ArticleService articleService;
+
+public class ArticleServiceStub implements ArticleService {
+    private final ArticleService articleService;
+    public ArticleServiceStub(ArticleService articleService) {
+        this.articleService = articleService;
+    }
+    @Override
+    public Article getArticleById(Integer id) {
+        // 此代码在客户端执行, 你可以在客户端做ThreadLocal本地缓存，或预先验证参数是否合法，等等
+        try {
+            return articleService.getArticleById(id);
+        } catch (Exception e) {
+            // 你可以容错，可以做任何AOP拦截事项
+            return new Article();
+        }
+    }
+}
+```
 
 **延迟暴露**
 
