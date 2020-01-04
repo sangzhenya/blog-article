@@ -1159,9 +1159,591 @@ private void registerServiceBeans(Set<String> packagesToScan, BeanDefinitionRegi
 
 
 
-
-
 ### 服务引用
+
+对于 Reference 则封装成 `ReferenceBean` Bean。
+
+在创建 Service 类的时候如果有使用 Reference 注解注释的时候 AutoWired 组件，会使用 `AnnotationInjectedBeanPostProcessor` 去创建或者获取需要的组件。
+
+```java
+// AnnotationInjectedBeanPostProcessor
+// 为 Bean inject 属性，Bean 是 Target 的 Bean，Bean Name 是属性名称，pvs 是属性值
+protected void inject(Object bean, String beanName, PropertyValues pvs) throws Throwable {
+  Class<?> injectedType = field.getType();
+  // 获取 injected Object
+  Object injectedObject = getInjectedObject(attributes, bean, beanName, injectedType, this);
+  ReflectionUtils.makeAccessible(field);
+  field.set(bean, injectedObject);
+}
+protected Object getInjectedObject(AnnotationAttributes attributes, Object bean, String beanName, Class<?> injectedType,
+                                       InjectionMetadata.InjectedElement injectedElement) throws Exception {
+  // 获取 Cache Key
+  String cacheKey = buildInjectedObjectCacheKey(attributes, bean, beanName, injectedType, injectedElement);
+  // 尝试从 Cache 中获取
+  Object injectedObject = injectedObjectsCache.get(cacheKey);
+  if (injectedObject == null) {
+    // 执行获取 Inject Bean 
+    injectedObject = doGetInjectedBean(attributes, bean, beanName, injectedType, injectedElement);
+    // Customized inject-object if necessary
+    injectedObjectsCache.putIfAbsent(cacheKey, injectedObject);
+  }
+  return injectedObject;
+}
+```
+
+```java
+// ReferenceAnnotationBeanPostProcessor
+protected Object doGetInjectedBean(AnnotationAttributes attributes, Object bean, String beanName, Class<?> injectedType,
+                                       InjectionMetadata.InjectedElement injectedElement) throws Exception {
+  // The name of bean that annotated Dubbo's {@link Service @Service} in local Spring {@link ApplicationContext}
+  // Referenced Bean 的名称：ServiceBean:com.xinyue.dubbo.api.service.ArticleService
+  String referencedBeanName = buildReferencedBeanName(attributes, injectedType);
+  // The name of bean that is declared by {@link Reference @Reference} annotation injection
+  // Reference Bean 名称：@Reference com.xinyue.dubbo.api.service.ArticleService
+  String referenceBeanName = getReferenceBeanName(attributes, injectedType);
+  // Build Reference Bean
+  ReferenceBean referenceBean = buildReferenceBeanIfAbsent(referenceBeanName, attributes, injectedType);
+  // Register an instance of ReferenceBean as a Spring Bean
+  registerReferenceBean(referencedBeanName, referenceBean, attributes, injectedType);
+  // 放到缓存中
+  cacheInjectedReferenceBean(referenceBean, injectedElement);
+  // Get or Create a proxy of ReferenceBean for the specified the type of Dubbo service interface
+  return getOrCreateProxy(referencedBeanName, referenceBeanName, referenceBean, injectedType);
+}
+private void registerReferenceBean(String referencedBeanName, ReferenceBean referenceBean,
+                                   AnnotationAttributes attributes,
+                                   Class<?> interfaceClass) {
+  // 获取 Bean Factory
+  ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+  // 获取 Bean 名称
+  String beanName = getReferenceBeanName(attributes, interfaceClass);
+  if (existsServiceBean(referencedBeanName)) { 
+    // If @Service bean is local one
+    // Get  the @Service's BeanDefinition from {@link BeanFactory}
+    AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) beanFactory.getBeanDefinition(referencedBeanName);
+    RuntimeBeanReference runtimeBeanReference = (RuntimeBeanReference) beanDefinition.getPropertyValues().get("ref");
+    // The name of bean annotated @Service
+    String serviceBeanName = runtimeBeanReference.getBeanName();
+    // register Alias rather than a new bean name, in order to reduce duplicated beans
+    beanFactory.registerAlias(serviceBeanName, beanName);
+  } else { 
+    // Remote @Service Bean
+    if (!beanFactory.containsBean(beanName)) {
+      // 注册到 Bean 工厂中
+      beanFactory.registerSingleton(beanName, referenceBean);
+    }
+  }
+}
+private Object getOrCreateProxy(String referencedBeanName, String referenceBeanName, ReferenceBean referenceBean, Class<?> serviceInterfaceType) {
+  if (existsServiceBean(referencedBeanName)) { 
+    // If the local @Service Bean exists, build a proxy of ReferenceBean
+    return newProxyInstance(getClassLoader(), new Class[]{serviceInterfaceType},
+                            wrapInvocationHandler(referenceBeanName, referenceBean));
+  } else {    
+    // ReferenceBean should be initialized and get immediately
+    return referenceBean.get();
+  }
+}
+```
+
+```java
+// ReferenceConfig
+public synchronized T get() {
+  // Check each config modules are created properly and override their properties if necessary.
+  // 和 ServiceConfig 中的类似
+  checkAndUpdateSubConfigs();
+  if (destroyed) {
+    throw new IllegalStateException("The invoker of ReferenceConfig(" + url + ") has already destroyed!");
+  }
+  if (ref == null) {
+    init();
+  }
+  return ref;
+}
+public void checkAndUpdateSubConfigs() {
+  if (StringUtils.isEmpty(interfaceName)) {
+    throw new IllegalStateException("<dubbo:reference interface=\"\" /> interface not allow null!");
+  }
+  // Complete Config
+  completeCompoundConfigs();
+  // 启动 config center, 刷新 Config
+  startConfigCenter();
+  // get consumer's global configuration
+  checkDefault();
+  // 刷新 Reference Config
+  this.refresh();
+  if (getGeneric() == null && getConsumer() != null) {
+    setGeneric(getConsumer().getGeneric());
+  }
+  // 一些校验
+  if (ProtocolUtils.isGeneric(getGeneric())) {
+    interfaceClass = GenericService.class;
+  } else {
+    try {
+      interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
+                                     .getContextClassLoader());
+    } catch (ClassNotFoundException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
+    checkInterfaceAndMethods(interfaceClass, methods);
+  }
+  resolveFile();
+  checkApplication();
+  checkMetadataReport();
+}
+
+private void init() {
+  if (initialized) {
+    return;
+  }
+  // Legitimacy check of stub, note that: the local will deprecated, and replace with stub
+  checkStubAndLocal(interfaceClass);
+  // Check Mock
+  checkMock(interfaceClass);
+  // Build 参数
+  Map<String, String> map = new HashMap<String, String>();
+  map.put(SIDE_KEY, CONSUMER_SIDE);
+  appendRuntimeParameters(map);
+  if (!ProtocolUtils.isGeneric(getGeneric())) {
+    String revision = Version.getVersion(interfaceClass, version);
+    if (revision != null && revision.length() > 0) {
+      map.put(REVISION_KEY, revision);
+    }
+
+    String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();
+    if (methods.length == 0) {
+      logger.warn("No method found in service interface " + interfaceClass.getName());
+      map.put(METHODS_KEY, ANY_VALUE);
+    } else {
+      map.put(METHODS_KEY, StringUtils.join(new HashSet<String>(Arrays.asList(methods)), COMMA_SEPARATOR));
+    }
+  }
+  map.put(INTERFACE_KEY, interfaceName);
+  appendParameters(map, metrics);
+  appendParameters(map, application);
+  appendParameters(map, module);
+  // remove 'default.' prefix for configs from ConsumerConfig
+  // appendParameters(map, consumer, Constants.DEFAULT_KEY);
+  appendParameters(map, consumer);
+  appendParameters(map, this);
+  Map<String, Object> attributes = null;
+  if (CollectionUtils.isNotEmpty(methods)) {
+    attributes = new HashMap<String, Object>();
+    for (MethodConfig methodConfig : methods) {
+      appendParameters(map, methodConfig, methodConfig.getName());
+      String retryKey = methodConfig.getName() + ".retry";
+      if (map.containsKey(retryKey)) {
+        String retryValue = map.remove(retryKey);
+        if ("false".equals(retryValue)) {
+          map.put(methodConfig.getName() + ".retries", "0");
+        }
+      }
+      attributes.put(methodConfig.getName(), convertMethodConfig2AsyncInfo(methodConfig));
+    }
+  }
+
+  String hostToRegistry = ConfigUtils.getSystemProperty(DUBBO_IP_TO_REGISTRY);
+  if (StringUtils.isEmpty(hostToRegistry)) {
+    hostToRegistry = NetUtils.getLocalHost();
+  } else if (isInvalidLocalHost(hostToRegistry)) {
+    throw new IllegalArgumentException("Specified invalid registry ip from property:" + DUBBO_IP_TO_REGISTRY + ", value:" + hostToRegistry);
+  }
+  map.put(REGISTER_IP_KEY, hostToRegistry);
+
+  // 创建代理
+  ref = createProxy(map);
+
+  // 生成 key 并 init Customer Model
+  String serviceKey = URL.buildKey(interfaceName, group, version);
+  ApplicationModel.initConsumerModel(serviceKey, buildConsumerModel(serviceKey, attributes));
+  initialized = true;
+}
+private T createProxy(Map<String, String> map) {
+  if (shouldJvmRefer(map)) {
+    // Ref JVM
+    URL url = new URL(LOCAL_PROTOCOL, LOCALHOST_VALUE, 0, interfaceClass.getName()).addParameters(map);
+    invoker = REF_PROTOCOL.refer(interfaceClass, url);
+    if (logger.isInfoEnabled()) {
+      logger.info("Using injvm service " + interfaceClass.getName());
+    }
+  } else {
+    urls.clear(); // reference retry init will add url to urls, lead to OOM
+    if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
+      String[] us = SEMICOLON_SPLIT_PATTERN.split(url);
+      if (us != null && us.length > 0) {
+        for (String u : us) {
+          URL url = URL.valueOf(u);
+          if (StringUtils.isEmpty(url.getPath())) {
+            url = url.setPath(interfaceName);
+          }
+          if (REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+            urls.add(url.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
+          } else {
+            urls.add(ClusterUtils.mergeUrl(url, map));
+          }
+        }
+      }
+    } else { // assemble URL from register center's configuration
+      // if protocols not injvm checkRegistry
+      if (!LOCAL_PROTOCOL.equalsIgnoreCase(getProtocol())){
+        // 和 Service Config 类似也是找到注册中心配置，转换校验，然后连接获取 动态的配置
+        checkRegistry();
+        // 获取到所有注册中心 URL
+        List<URL> us = loadRegistries(false);
+        if (CollectionUtils.isNotEmpty(us)) {
+          for (URL u : us) {
+            URL monitorUrl = loadMonitor(u);
+            if (monitorUrl != null) {
+              map.put(MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
+            }
+            urls.add(u.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
+          }
+        }
+        if (urls.isEmpty()) {
+          throw new IllegalStateException("No such any registry to reference " + interfaceName + " on the consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion() + ", please config <dubbo:registry address=\"...\" /> to your spring config.");
+        }
+      }
+    }
+
+    if (urls.size() == 1) {
+      // 如果只有一个注册中心的 URL 则直接获取即可 invoker
+      // 会调用到 RegistryProtocol 的 refer
+      invoker = REF_PROTOCOL.refer(interfaceClass, urls.get(0));
+    } else {
+      // 如果有多个则遍历获取
+      List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
+      URL registryURL = null;
+      for (URL url : urls) {
+        invokers.add(REF_PROTOCOL.refer(interfaceClass, url));
+        if (REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+          registryURL = url; // use last registry url
+        }
+      }
+      // 获取一个 invoker 集合
+      if (registryURL != null) { // registry url is available
+        // use RegistryAwareCluster only when register's CLUSTER is available
+        URL u = registryURL.addParameter(CLUSTER_KEY, RegistryAwareCluster.NAME);
+        // The invoker wrap relation would be: RegistryAwareClusterInvoker(StaticDirectory) -> FailoverClusterInvoker(RegistryDirectory, will execute route) -> Invoker
+        invoker = CLUSTER.join(new StaticDirectory(u, invokers));
+      } else { // not a registry url, must be direct invoke.
+        invoker = CLUSTER.join(new StaticDirectory(invokers));
+      }
+    }
+  }
+
+  if (shouldCheck() && !invoker.isAvailable()) {
+    throw new IllegalStateException("Failed to check the status of the service " + interfaceName + ". No provider available for the service " + (group == null ? "" : group + "/") + interfaceName + (version == null ? "" : ":" + version) + " from the url " + invoker.getUrl() + " to the consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion());
+  }
+  if (logger.isInfoEnabled()) {
+    logger.info("Refer dubbo service " + interfaceClass.getName() + " from url " + invoker.getUrl());
+  }
+  
+  // 元信息发布
+  MetadataReportService metadataReportService = null;
+  if ((metadataReportService = getMetadataReportService()) != null) {
+    URL consumerURL = new URL(CONSUMER_PROTOCOL, map.remove(REGISTER_IP_KEY), 0, map.get(INTERFACE_KEY), map);
+    metadataReportService.publishConsumer(consumerURL);
+  }
+  // create service proxy
+  return (T) PROXY_FACTORY.getProxy(invoker);
+}
+protected List<URL> loadRegistries(boolean provider) {
+  // check && override if necessary
+  List<URL> registryList = new ArrayList<URL>();
+  // 遍历注册中心
+  if (CollectionUtils.isNotEmpty(registries)) {
+    for (RegistryConfig config : registries) {
+      String address = config.getAddress();
+      if (StringUtils.isEmpty(address)) {
+        address = ANYHOST_VALUE;
+      }
+      if (!RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
+        Map<String, String> map = new HashMap<String, String>();
+        appendParameters(map, application);
+        appendParameters(map, config);
+        map.put(PATH_KEY, RegistryService.class.getName());
+        appendRuntimeParameters(map);
+        if (!map.containsKey(PROTOCOL_KEY)) {
+          map.put(PROTOCOL_KEY, DUBBO_PROTOCOL);
+        }
+        List<URL> urls = UrlUtils.parseURLs(address, map);
+
+        // 找到所有的注册中心 URL 并返回
+        for (URL url : urls) {
+          url = URLBuilder.from(url)
+            .addParameter(REGISTRY_KEY, url.getProtocol())
+            .setProtocol(REGISTRY_PROTOCOL)
+            .build();
+          if ((provider && url.getParameter(REGISTER_KEY, true))
+              || (!provider && url.getParameter(SUBSCRIBE_KEY, true))) {
+            registryList.add(url);
+          }
+        }
+      }
+    }
+  }
+  return registryList;
+}
+```
+
+```java
+// RegistryProtocol
+public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+  // 生成 URL
+  url = URLBuilder.from(url)
+    .setProtocol(url.getParameter(REGISTRY_KEY, DEFAULT_REGISTRY))
+    .removeParameter(REGISTRY_KEY)
+    .build();
+  // 根据 URL 获取注册中心
+  Registry registry = registryFactory.getRegistry(url);
+  if (RegistryService.class.equals(type)) {
+    // 如果是注册中心 Service 则通过 ProxyFactory 创建 invoker
+    return proxyFactory.getInvoker((T) registry, type, url);
+  }
+
+  // group="a,b" or group="*"
+  Map<String, String> qs = StringUtils.parseQueryString(url.getParameterAndDecoded(REFER_KEY));
+  String group = qs.get(GROUP_KEY);
+  if (group != null && group.length() > 0) {
+    if ((COMMA_SPLIT_PATTERN.split(group)).length > 1 || "*".equals(group)) {
+      return doRefer(getMergeableCluster(), registry, type, url);
+    }
+  }
+  // 执行获取
+  return doRefer(cluster, registry, type, url);
+}
+private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
+  // 新建一个注册发现根据需要 provider 的 type 和 当前的 url
+  RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
+  // 设置注册中心和协议
+  directory.setRegistry(registry);
+  directory.setProtocol(protocol);
+  // all attributes of REFER_KEY
+  Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
+  // 生成订阅者的 URL
+  URL subscribeUrl = new URL(CONSUMER_PROTOCOL, parameters.remove(REGISTER_IP_KEY), 0, type.getName(), parameters);
+  if (!ANY_VALUE.equals(url.getServiceInterface()) && url.getParameter(REGISTER_KEY, true)) {
+    directory.setRegisteredConsumerUrl(getRegisteredConsumerUrl(subscribeUrl, url));
+    // 注册 Customer
+    registry.register(directory.getRegisteredConsumerUrl());
+  }
+  directory.buildRouterChain(subscribeUrl);
+  // 开始订阅
+  directory.subscribe(subscribeUrl.addParameter(CATEGORY_KEY,
+                                                PROVIDERS_CATEGORY + "," + CONFIGURATORS_CATEGORY + "," + ROUTERS_CATEGORY));
+
+  // 订阅后就拿到了 invoker
+  Invoker invoker = cluster.join(directory);
+  // 注册到 ProviderConsumerRegTable 中
+  ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
+  return invoker;
+}
+```
+
+```java
+// RegistryDirectory
+public void subscribe(URL url) {
+  // 设置 Consumer 的 URL
+  setConsumerUrl(url);
+  CONSUMER_CONFIGURATION_LISTENER.addNotifyListener(this);
+  serviceConfigurationListener = new ReferenceConfigurationListener(this, url);
+  registry.subscribe(url, this);
+}
+public synchronized void notify(List<URL> urls) {
+  // 获取到的 provider 的url
+  Map<String, List<URL>> categoryUrls = urls.stream()
+    .filter(Objects::nonNull)
+    .filter(this::isValidCategory)
+    .filter(this::isNotCompatibleFor26x)
+    .collect(Collectors.groupingBy(url -> {
+      if (UrlUtils.isConfigurator(url)) {
+        return CONFIGURATORS_CATEGORY;
+      } else if (UrlUtils.isRoute(url)) {
+        return ROUTERS_CATEGORY;
+      } else if (UrlUtils.isProvider(url)) {
+        return PROVIDERS_CATEGORY;
+      }
+      return "";
+    }));
+
+  List<URL> configuratorURLs = categoryUrls.getOrDefault(CONFIGURATORS_CATEGORY, Collections.emptyList());
+  this.configurators = Configurator.toConfigurators(configuratorURLs).orElse(this.configurators);
+
+  List<URL> routerURLs = categoryUrls.getOrDefault(ROUTERS_CATEGORY, Collections.emptyList());
+  toRouters(routerURLs).ifPresent(this::addRouters);
+
+  // providers
+  List<URL> providerURLs = categoryUrls.getOrDefault(PROVIDERS_CATEGORY, Collections.emptyList());
+  // 刷新和覆盖 invoker
+  refreshOverrideAndInvoker(providerURLs);
+}
+```
+
+```java
+// FailbackRegistry
+public void subscribe(URL url, NotifyListener listener) {
+  super.subscribe(url, listener);
+  removeFailedSubscribed(url, listener);
+  try {
+    // Sending a subscription request to the server side
+    doSubscribe(url, listener);
+  } catch (Exception e) {
+    Throwable t = e;
+
+    List<URL> urls = getCacheUrls(url);
+    if (CollectionUtils.isNotEmpty(urls)) {
+      notify(url, listener, urls);
+      logger.error("Failed to subscribe " + url + ", Using cached list: " + urls + " from cache file: " + getUrl().getParameter(FILE_KEY, System.getProperty("user.home") + "/dubbo-registry-" + url.getHost() + ".cache") + ", cause: " + t.getMessage(), t);
+    } else {
+      // If the startup detection is opened, the Exception is thrown directly.
+      boolean check = getUrl().getParameter(Constants.CHECK_KEY, true)
+        && url.getParameter(Constants.CHECK_KEY, true);
+      boolean skipFailback = t instanceof SkipFailbackWrapperException;
+      if (check || skipFailback) {
+        if (skipFailback) {
+          t = t.getCause();
+        }
+        throw new IllegalStateException("Failed to subscribe " + url + ", cause: " + t.getMessage(), t);
+      } else {
+        logger.error("Failed to subscribe " + url + ", waiting for retry, cause: " + t.getMessage(), t);
+      }
+    }
+
+    // Record a failed registration request to a failed list, retry regularly
+    addFailedSubscribed(url, listener);
+  }
+}
+// 去订阅
+public void doSubscribe(final URL url, final NotifyListener listener) {
+  try {
+    if (ANY_VALUE.equals(url.getServiceInterface())) {
+      String root = toRootPath();
+      ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
+      if (listeners == null) {
+        zkListeners.putIfAbsent(url, new ConcurrentHashMap<>());
+        listeners = zkListeners.get(url);
+      }
+      ChildListener zkListener = listeners.get(listener);
+      if (zkListener == null) {
+        listeners.putIfAbsent(listener, (parentPath, currentChilds) -> {
+          for (String child : currentChilds) {
+            child = URL.decode(child);
+            if (!anyServices.contains(child)) {
+              anyServices.add(child);
+              subscribe(url.setPath(child).addParameters(INTERFACE_KEY, child,
+                                                         Constants.CHECK_KEY, String.valueOf(false)), listener);
+            }
+          }
+        });
+        zkListener = listeners.get(listener);
+      }
+      zkClient.create(root, false);
+      List<String> services = zkClient.addChildListener(root, zkListener);
+      if (CollectionUtils.isNotEmpty(services)) {
+        for (String service : services) {
+          service = URL.decode(service);
+          anyServices.add(service);
+          subscribe(url.setPath(service).addParameters(INTERFACE_KEY, service,
+                                                       Constants.CHECK_KEY, String.valueOf(false)), listener);
+        }
+      }
+    } else {
+      // 如果有订阅的接口
+      List<URL> urls = new ArrayList<>();
+      for (String path : toCategoriesPath(url)) {
+        // 获取 listener
+        ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
+        if (listeners == null) {
+          zkListeners.putIfAbsent(url, new ConcurrentHashMap<>());
+          // 从注册中心中获取 listener
+          listeners = zkListeners.get(url);
+        }
+        ChildListener zkListener = listeners.get(listener);
+        if (zkListener == null) {
+          listeners.putIfAbsent(listener, (parentPath, currentChilds) -> ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds)));
+          // 获取 listener
+          zkListener = listeners.get(listener);
+        }
+        // 在注册中心中创建订阅
+        zkClient.create(path, false);
+        List<String> children = zkClient.addChildListener(path, zkListener);
+        if (children != null) {
+          urls.addAll(toUrlsWithEmpty(url, path, children));
+        }
+      }
+      // 通过获取到了 listener
+      notify(url, listener, urls);
+    }
+  } catch (Throwable e) {
+    throw new RpcException("Failed to subscribe " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
+  }
+}
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+  if (url == null) {
+    throw new IllegalArgumentException("notify url == null");
+  }
+  if (listener == null) {
+    throw new IllegalArgumentException("notify listener == null");
+  }
+  try {
+    doNotify(url, listener, urls);
+  } catch (Exception t) {
+    // Record a failed registration request to a failed list, retry regularly
+    addFailedNotified(url, listener, urls);
+    logger.error("Failed to notify for subscribe " + url + ", waiting for retry, cause: " + t.getMessage(), t);
+  }
+}
+protected void doNotify(URL url, NotifyListener listener, List<URL> urls) {
+  super.notify(url, listener, urls);
+}
+```
+
+```java
+// AbstractRegistry
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+  if (url == null) {
+    throw new IllegalArgumentException("notify url == null");
+  }
+  if (listener == null) {
+    throw new IllegalArgumentException("notify listener == null");
+  }
+  if ((CollectionUtils.isEmpty(urls))
+      && !ANY_VALUE.equals(url.getServiceInterface())) {
+    logger.warn("Ignore empty notify urls for subscribe url " + url);
+    return;
+  }
+  if (logger.isInfoEnabled()) {
+    logger.info("Notify urls for subscribe url " + url + ", urls: " + urls);
+  }
+  // keep every provider's category.
+  Map<String, List<URL>> result = new HashMap<>();
+  for (URL u : urls) {
+    if (UrlUtils.isMatch(url, u)) {
+      String category = u.getParameter(CATEGORY_KEY, DEFAULT_CATEGORY);
+      List<URL> categoryList = result.computeIfAbsent(category, k -> new ArrayList<>());
+      categoryList.add(u);
+    }
+  }
+  if (result.size() == 0) {
+    return;
+  }
+  Map<String, List<URL>> categoryNotified = notified.computeIfAbsent(url, u -> new ConcurrentHashMap<>());
+  for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
+    String category = entry.getKey();
+    List<URL> categoryList = entry.getValue();
+    categoryNotified.put(category, categoryList);
+    // 调用 listener 的 notify 方法
+    listener.notify(categoryList);
+    // We will update our cache file after each notification.
+    // When our Registry has a subscribe failure due to network jitter, we can return at least the existing cache URL.
+    saveProperties(url);
+  }
+}
+```
+
+
+
+
 
 ### 服务调用
 
