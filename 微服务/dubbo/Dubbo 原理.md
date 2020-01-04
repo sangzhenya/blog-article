@@ -1577,6 +1577,135 @@ public synchronized void notify(List<URL> urls) {
   // 刷新和覆盖 invoker
   refreshOverrideAndInvoker(providerURLs);
 }
+private void refreshOverrideAndInvoker(List<URL> urls) {
+  // mock zookeeper://xxx?mock=return null
+  overrideDirectoryUrl();
+  // 根据 URL 刷卡 invoker
+  refreshInvoker(urls);
+}
+private void refreshInvoker(List<URL> invokerUrls) {
+  Assert.notNull(invokerUrls, "invokerUrls should not be null");
+
+  if (invokerUrls.size() == 1
+      && invokerUrls.get(0) != null
+      && EMPTY_PROTOCOL.equals(invokerUrls.get(0).getProtocol())) {
+    this.forbidden = true; // Forbid to access
+    this.invokers = Collections.emptyList();
+    routerChain.setInvokers(this.invokers);
+    destroyAllInvokers(); // Close all invokers
+  } else {
+    this.forbidden = false; // Allow to access
+    Map<String, Invoker<T>> oldUrlInvokerMap = this.urlInvokerMap; // local reference
+    if (invokerUrls == Collections.<URL>emptyList()) {
+      invokerUrls = new ArrayList<>();
+    }
+    if (invokerUrls.isEmpty() && this.cachedInvokerUrls != null) {
+      invokerUrls.addAll(this.cachedInvokerUrls);
+    } else {
+      this.cachedInvokerUrls = new HashSet<>();
+      this.cachedInvokerUrls.addAll(invokerUrls);//Cached invoker urls, convenient for comparison
+    }
+    if (invokerUrls.isEmpty()) {
+      return;
+    }
+    // 根据 URL 获取 Invoker
+    Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls);// Translate url list to Invoker map
+
+    /**
+             * If the calculation is wrong, it is not processed.
+             *
+             * 1. The protocol configured by the client is inconsistent with the protocol of the server.
+             *    eg: consumer protocol = dubbo, provider only has other protocol services(rest).
+             * 2. The registration center is not robust and pushes illegal specification data.
+             *
+             */
+    if (CollectionUtils.isEmptyMap(newUrlInvokerMap)) {
+      logger.error(new IllegalStateException("urls to invokers error .invokerUrls.size :" + invokerUrls.size() + ", invoker.size :0. urls :" + invokerUrls
+                                             .toString()));
+      return;
+    }
+
+    List<Invoker<T>> newInvokers = Collections.unmodifiableList(new ArrayList<>(newUrlInvokerMap.values()));
+    // pre-route and build cache, notice that route cache should build on original Invoker list.
+    // toMergeMethodInvokerMap() will wrap some invokers having different groups, those wrapped invokers not should be routed.
+    routerChain.setInvokers(newInvokers);
+    this.invokers = multiGroup ? toMergeInvokerList(newInvokers) : newInvokers;
+    this.urlInvokerMap = newUrlInvokerMap;
+
+    try {
+      destroyUnusedInvokers(oldUrlInvokerMap, newUrlInvokerMap); // Close the unused Invoker
+    } catch (Exception e) {
+      logger.warn("destroyUnusedInvokers error. ", e);
+    }
+  }
+}
+private Map<String, Invoker<T>> toInvokers(List<URL> urls) {
+  Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<>();
+  if (urls == null || urls.isEmpty()) {
+    return newUrlInvokerMap;
+  }
+  Set<String> keys = new HashSet<>();
+  String queryProtocols = this.queryMap.get(PROTOCOL_KEY);
+  for (URL providerUrl : urls) {
+    // If protocol is configured at the reference side, only the matching protocol is selected
+    if (queryProtocols != null && queryProtocols.length() > 0) {
+      boolean accept = false;
+      String[] acceptProtocols = queryProtocols.split(",");
+      for (String acceptProtocol : acceptProtocols) {
+        if (providerUrl.getProtocol().equals(acceptProtocol)) {
+          accept = true;
+          break;
+        }
+      }
+      if (!accept) {
+        continue;
+      }
+    }
+    if (EMPTY_PROTOCOL.equals(providerUrl.getProtocol())) {
+      continue;
+    }
+    if (!ExtensionLoader.getExtensionLoader(Protocol.class).hasExtension(providerUrl.getProtocol())) {
+      logger.error(new IllegalStateException("Unsupported protocol " + providerUrl.getProtocol() +
+                                             " in notified url: " + providerUrl + " from registry " + getUrl().getAddress() +
+                                             " to consumer " + NetUtils.getLocalHost() + ", supported protocol: " +
+                                             ExtensionLoader.getExtensionLoader(Protocol.class).getSupportedExtensions()));
+      continue;
+    }
+    URL url = mergeUrl(providerUrl);
+
+    String key = url.toFullString(); // The parameter urls are sorted
+    if (keys.contains(key)) { // Repeated url
+      continue;
+    }
+    keys.add(key);
+    // Cache key is url that does not merge with consumer side parameters, regardless of how the consumer combines parameters, if the server url changes, then refer again
+    Map<String, Invoker<T>> localUrlInvokerMap = this.urlInvokerMap; // local reference
+    Invoker<T> invoker = localUrlInvokerMap == null ? null : localUrlInvokerMap.get(key);
+    if (invoker == null) { // Not in the cache, refer again
+      try {
+        boolean enabled = true;
+        if (url.hasParameter(DISABLED_KEY)) {
+          enabled = !url.getParameter(DISABLED_KEY, false);
+        } else {
+          enabled = url.getParameter(ENABLED_KEY, true);
+        }
+        if (enabled) {
+          // 创建 invoker delegate，最终创建的是一个 dubbo 的 config
+          invoker = new InvokerDelegate<>(protocol.refer(serviceType, url), url, providerUrl);
+        }
+      } catch (Throwable t) {
+        logger.error("Failed to refer invoker for interface:" + serviceType + ",url:(" + url + ")" + t.getMessage(), t);
+      }
+      if (invoker != null) { // Put new invoker in cache
+        newUrlInvokerMap.put(key, invoker);
+      }
+    } else {
+      newUrlInvokerMap.put(key, invoker);
+    }
+  }
+  keys.clear();
+  return newUrlInvokerMap;
+}
 ```
 
 ```java
@@ -1741,9 +1870,67 @@ protected void notify(URL url, NotifyListener listener, List<URL> urls) {
 }
 ```
 
+```java
+// DubboProtocol
+public <T> Invoker<T> protocolBindingRefer(Class<T> serviceType, URL url) throws RpcException {
+  optimizeSerialization(url);
 
+  // create rpc invoker.
+  DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
+  invokers.add(invoker);
 
-
+  return invoker;
+}
+// 获取客户端地址
+private ExchangeClient[] getClients(URL url) {
+  // whether to share connection
+  boolean useShareConnect = false;
+  int connections = url.getParameter(CONNECTIONS_KEY, 0);
+  List<ReferenceCountExchangeClient> shareClients = null;
+  // if not configured, connection is shared, otherwise, one connection for one service
+  if (connections == 0) {
+    useShareConnect = true;
+    // The xml configuration should have a higher priority than properties.
+    String shareConnectionsStr = url.getParameter(SHARE_CONNECTIONS_KEY, (String) null);
+    connections = Integer.parseInt(StringUtils.isBlank(shareConnectionsStr) ? ConfigUtils.getProperty(SHARE_CONNECTIONS_KEY,
+    shareClients = getSharedClient(url, connections);
+  }
+  ExchangeClient[] clients = new ExchangeClient[connections];
+  for (int i = 0; i < clients.length; i++) {
+    if (useShareConnect) {
+      clients[i] = shareClients.get(i);
+    } else {
+      clients[i] = initClient(url);
+    }
+  }
+  return clients;
+}
+private ExchangeClient initClient(URL url) {
+  // client type setting.
+  String str = url.getParameter(CLIENT_KEY, url.getParameter(SERVER_KEY, DEFAULT_REMOTING_CLIENT));
+  url = url.addParameter(CODEC_KEY, DubboCodec.NAME);
+  // enable heartbeat by default
+  url = url.addParameterIfAbsent(HEARTBEAT_KEY, String.valueOf(DEFAULT_HEARTBEAT));
+  // BIO is not allowed since it has severe performance issue.
+  if (str != null && str.length() > 0 && !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {
+    throw new RpcException("Unsupported client type: " + str + "," +
+                           " supported client type is " + StringUtils.join(ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions(), " "));
+  }
+  ExchangeClient client;
+  try {
+    // connection should be lazy
+    if (url.getParameter(LAZY_CONNECT_KEY, false)) {
+      client = new LazyConnectExchangeClient(url, requestHandler);
+    } else {
+      // 最终创建了一个 NettyClient 的连接
+      client = Exchangers.connect(url, requestHandler);
+    }
+  } catch (RemotingException e) {
+    throw new RpcException("Fail to create remoting client for service(" + url + "): " + e.getMessage(), e);
+  }
+  return client;
+}
+```
 
 ### 服务调用
 
