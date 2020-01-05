@@ -238,6 +238,8 @@ private void customize(String beanName, AbstractConfig dubboConfig) {
 
 ### 服务暴露
 
+参考：[Dubbo 服务导出](http://dubbo.apache.org/zh-cn/docs/source_code_guide/export-service.html)
+
 在准备好 Config 之后，就可以暴露出服务了。在容器刷新的最后一步你 `finishRefresh` 方法中会将刷新完成时间发布出去。`ServiceBean` 为监听这个事件并执行 `onApplicationEvent` 方法。 在该方法中会 export 服务。
 
 ```java
@@ -1161,6 +1163,8 @@ private void registerServiceBeans(Set<String> packagesToScan, BeanDefinitionRegi
 
 ### 服务引用
 
+参考：[服务引用](http://dubbo.apache.org/zh-cn/docs/source_code_guide/refer-service.html)
+
 对于 Reference 则封装成 `ReferenceBean` Bean。
 
 在创建 Service 类的时候如果有使用 Reference 注解注释的时候 AutoWired 组件，会使用 `AnnotationInjectedBeanPostProcessor` 去创建或者获取需要的组件。
@@ -1934,16 +1938,374 @@ private ExchangeClient initClient(URL url) {
 
 ### 服务调用
 
+参考：[服务调用](http://dubbo.apache.org/zh-cn/docs/source_code_guide/service-invoking-process.html)
 
+一个简单的方法如下：
 
-
-
+```java
+@GetMapping("/")
+public Article hello() {
+    return articleService.getArticleById(1);
+}
 ```
-ServiceBean
-DubboProtocol
-Protocol
-RegistryProtocol
-ServieConfig
-ReferenceBean
+
+Debug 运行查看 Dubbo 生成的 Proxy 类如下：
+
+![Dubbo Proxy](http://img.programya.com/20200105102938.png)
+
+首先调用的是 `InvokerInvocationHandler` 中的 invoker 方法
+
+```java
+// InvokerInvocationHandler
+public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+  String methodName = method.getName();
+  Class<?>[] parameterTypes = method.getParameterTypes();
+  if (method.getDeclaringClass() == Object.class) {
+    return method.invoke(invoker, args);
+  }
+  if ("toString".equals(methodName) && parameterTypes.length == 0) {
+    return invoker.toString();
+  }
+  if ("hashCode".equals(methodName) && parameterTypes.length == 0) {
+    return invoker.hashCode();
+  }
+  if ("equals".equals(methodName) && parameterTypes.length == 1) {
+    return invoker.equals(args[0]);
+  }
+
+  // 判断不是 Object 的几个方法之后继续执行 invoke
+  return invoker.invoke(new RpcInvocation(method, args)).recreate();
+}
+```
+
+然后到了 `AbstractClusterInvoker` 中
+
+```java
+public Result invoke(final Invocation invocation) throws RpcException {
+  // 校验是否已经被销毁
+  checkWhetherDestroyed();
+
+  // binding attachments into invocation.
+  Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+  if (contextAttachments != null && contextAttachments.size() != 0) {
+    ((RpcInvocation) invocation).addAttachments(contextAttachments);
+  }
+
+  // 获取所有可用的 invoker
+  List<Invoker<T>> invokers = list(invocation);
+  // 初始化负载均衡机制
+  LoadBalance loadbalance = initLoadBalance(invokers, invocation);
+  // Idempotent operation: invocation id will be added in async operation by default
+  RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+  //  执行 invoke
+  return doInvoke(invocation, invokers, loadbalance);
+}
+```
+
+然后到了 `FailoverClusterInvoker` 中
+
+```java
+public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+  List<Invoker<T>> copyInvokers = invokers;
+  // 确保有 invokers
+  checkInvokers(copyInvokers, invocation);
+  // 获取方法名称
+  String methodName = RpcUtils.getMethodName(invocation);
+  // 获取重试次数
+  int len = getUrl().getMethodParameter(methodName, RETRIES_KEY, DEFAULT_RETRIES) + 1;
+  if (len <= 0) {
+    len = 1;
+  }
+  // retry loop.
+  RpcException le = null; // last exception.
+  List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(copyInvokers.size()); // invoked invokers.
+  Set<String> providers = new HashSet<String>(len);
+  for (int i = 0; i < len; i++) {
+    //Reselect before retry to avoid a change of candidate `invokers`.
+    //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
+    if (i > 0) {
+      // 判断是否已经被销毁
+      checkWhetherDestroyed();
+      // 获取 invokers
+      copyInvokers = list(invocation);
+      // check again
+      checkInvokers(copyInvokers, invocation);
+    }
+    // 根据负载均衡机制选择一个 invoker
+    Invoker<T> invoker = select(loadbalance, invocation, copyInvokers, invoked);
+    invoked.add(invoker);
+    // 把 invoker 放到上下文中
+    RpcContext.getContext().setInvokers((List) invoked);
+    try {
+      // 执行 invoker
+      Result result = invoker.invoke(invocation);
+      if (le != null && logger.isWarnEnabled()) {
+        logger.warn("Although retry the method " + methodName
+                    + " in the service " + getInterface().getName()
+                    + " was successful by the provider " + invoker.getUrl().getAddress()
+                    + ", but there have been failed providers " + providers
+                    + " (" + providers.size() + "/" + copyInvokers.size()
+                    + ") from the registry " + directory.getUrl().getAddress()
+                    + " on the consumer " + NetUtils.getLocalHost()
+                    + " using the dubbo version " + Version.getVersion() + ". Last error is: "
+                    + le.getMessage(), le);
+      }
+      // 返回结果
+      return result;
+    } catch (RpcException e) {
+      if (e.isBiz()) { // biz exception.
+        throw e;
+      }
+      le = e;
+    } catch (Throwable e) {
+      le = new RpcException(e.getMessage(), e);
+    } finally {
+      providers.add(invoker.getUrl().getAddress());
+    }
+  }
+  throw new RpcException(le.getCode(), "Failed to invoke the method "
+                         + methodName + " in the service " + getInterface().getName()
+                         + ". Tried " + len + " times of the providers " + providers
+                         + " (" + providers.size() + "/" + copyInvokers.size()
+                         + ") from the registry " + directory.getUrl().getAddress()
+                         + " on the consumer " + NetUtils.getLocalHost() + " using the dubbo version "
+                         + Version.getVersion() + ". Last error is: "
+                         + le.getMessage(), le.getCause() != null ? le.getCause() : le);
+}
+```
+
+```java
+// ProtocolFilterWrapper
+public Result invoke(Invocation invocation) throws RpcException {
+  // 调用 filter invoker
+  Result asyncResult = filterInvoker.invoke(invocation);
+
+  asyncResult = asyncResult.whenCompleteWithContext((r, t) -> {
+    for (int i = filters.size() - 1; i >= 0; i--) {
+      Filter filter = filters.get(i);
+      // onResponse callback
+      if (filter instanceof ListenableFilter) {
+        Filter.Listener listener = ((ListenableFilter) filter).listener();
+        if (listener != null) {
+          if (t == null) {
+            listener.onResponse(r, filterInvoker, invocation);
+          } else {
+            listener.onError(t, filterInvoker, invocation);
+          }
+        }
+      } else {
+        filter.onResponse(r, filterInvoker, invocation);
+      }
+    }
+  });
+  return asyncResult;
+}
+```
+
+```java
+// ProtocolFilterWrapper
+public Result invoke(Invocation invocation) throws RpcException {
+  Result asyncResult;
+  try {
+    // 调用 filter invoke
+    asyncResult = filter.invoke(next, invocation);
+  } catch (Exception e) {
+    // onError callback
+    if (filter instanceof ListenableFilter) {
+      Filter.Listener listener = ((ListenableFilter) filter).listener();
+      if (listener != null) {
+        listener.onError(e, invoker, invocation);
+      }
+    }
+    throw e;
+  }
+  return asyncResult;
+}
+```
+
+```java
+// ConsumerContextFilter
+public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+  // 在上下文中设置相关的信息
+  RpcContext.getContext()
+    .setInvoker(invoker)
+    .setInvocation(invocation)
+    .setLocalAddress(NetUtils.getLocalHost(), 0)
+    .setRemoteAddress(invoker.getUrl().getHost(), invoker.getUrl().getPort())
+    .setRemoteApplicationName(invoker.getUrl().getParameter(REMOTE_APPLICATION_KEY))
+    .setAttachment(REMOTE_APPLICATION_KEY, invoker.getUrl().getParameter(APPLICATION_KEY));
+  if (invocation instanceof RpcInvocation) {
+    ((RpcInvocation) invocation).setInvoker(invoker);
+  }
+  try {
+    RpcContext.removeServerContext();
+    // 继续调用 invoke
+    return invoker.invoke(invocation);
+  } finally {
+    RpcContext.removeContext();
+  }
+}
+```
+
+```java
+// FutureFilter
+public Result invoke(final Invoker<?> invoker, final Invocation invocation) throws RpcException {
+  // 主要是为异步用的
+  fireInvokeCallback(invoker, invocation);
+  // need to configure if there's return value before the invocation in order to help invoker to judge if it's
+  // necessary to return future.
+  return invoker.invoke(invocation);
+}
+```
+
+```java
+// MonitorFilter
+public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+  // 判断是否需要 monitor
+  if (invoker.getUrl().hasParameter(MONITOR_KEY)) {
+    invocation.setAttachment(MONITOR_FILTER_START_TIME, String.valueOf(System.currentTimeMillis()));
+    getConcurrent(invoker, invocation).incrementAndGet(); // count up
+  }
+  return invoker.invoke(invocation); // proceed invocation chain
+}
+```
+
+```java
+// AsyncToSyncInvoker
+public Result invoke(Invocation invocation) throws RpcException {
+  // 执行 invoke
+  Result asyncResult = invoker.invoke(invocation);
+
+  try {
+    // 等待获取结果
+    if (InvokeMode.SYNC == ((RpcInvocation) invocation).getInvokeMode()) {
+      asyncResult.get(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
+    }
+  } catch (InterruptedException e) {
+    throw new RpcException("Interrupted unexpectedly while waiting for remoting result to return!  method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+  } catch (ExecutionException e) {
+    Throwable t = e.getCause();
+    if (t instanceof TimeoutException) {
+      throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Invoke remote method timeout. method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+    } else if (t instanceof RemotingException) {
+      throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+    }
+  } catch (Throwable e) {
+    throw new RpcException(e.getMessage(), e);
+  }
+  // 返回结果
+  return asyncResult;
+}
+```
+
+```java
+// AbstractInvoker
+public Result invoke(Invocation inv) throws RpcException {
+  // if invoker is destroyed due to address refresh from registry, let's allow the current invoke to proceed
+  if (destroyed.get()) {
+    logger.warn("Invoker for service " + this + " on consumer " + NetUtils.getLocalHost() + " is destroyed, "
+                + ", dubbo version is " + Version.getVersion() + ", this invoker should not be used any longer");
+  }
+  RpcInvocation invocation = (RpcInvocation) inv;
+  invocation.setInvoker(this);
+  // 设置 attachment
+  if (CollectionUtils.isNotEmptyMap(attachment)) {
+    invocation.addAttachmentsIfAbsent(attachment);
+  }
+  Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+  if (CollectionUtils.isNotEmptyMap(contextAttachments)) {
+    /**
+             * invocation.addAttachmentsIfAbsent(context){@link RpcInvocation#addAttachmentsIfAbsent(Map)}should not be used here,
+             * because the {@link RpcContext#setAttachment(String, String)} is passed in the Filter when the call is triggered
+             * by the built-in retry mechanism of the Dubbo. The attachment to update RpcContext will no longer work, which is
+             * a mistake in most cases (for example, through Filter to RpcContext output traceId and spanId and other information).
+             */
+    invocation.addAttachments(contextAttachments);
+  }
+
+  // 设置 invoke mode
+  invocation.setInvokeMode(RpcUtils.getInvokeMode(url, invocation));
+  RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+
+  try {
+    // 执行 invoke
+    return doInvoke(invocation);
+  } catch (InvocationTargetException e) { 
+    // biz exception
+    Throwable te = e.getTargetException();
+    if (te == null) {
+      return AsyncRpcResult.newDefaultAsyncResult(null, e, invocation);
+    } else {
+      if (te instanceof RpcException) {
+        ((RpcException) te).setCode(RpcException.BIZ_EXCEPTION);
+      }
+      return AsyncRpcResult.newDefaultAsyncResult(null, te, invocation);
+    }
+  } catch (RpcException e) {
+    if (e.isBiz()) {
+      return AsyncRpcResult.newDefaultAsyncResult(null, e, invocation);
+    } else {
+      throw e;
+    }
+  } catch (Throwable e) {
+    return AsyncRpcResult.newDefaultAsyncResult(null, e, invocation);
+  }
+}
+```
+
+```java
+// DubboInvoker
+protected Result doInvoke(final Invocation invocation) throws Throwable {
+  RpcInvocation inv = (RpcInvocation) invocation;
+  final String methodName = RpcUtils.getMethodName(invocation);
+  inv.setAttachment(PATH_KEY, getUrl().getPath());
+  inv.setAttachment(VERSION_KEY, version);
+
+  // 获取 ExchangeClient
+  ExchangeClient currentClient;
+  if (clients.length == 1) {
+    currentClient = clients[0];
+  } else {
+    currentClient = clients[index.getAndIncrement() % clients.length];
+  }
+  try {
+    boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
+    int timeout = getUrl().getMethodPositiveParameter(methodName, TIMEOUT_KEY, DEFAULT_TIMEOUT);
+    if (isOneway) {
+      boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
+      currentClient.send(inv, isSent);
+      return AsyncRpcResult.newDefaultAsyncResult(invocation);
+    } else {
+      // 创建一个异步的 rpc result
+      AsyncRpcResult asyncRpcResult = new AsyncRpcResult(inv);
+      // 使用 Netty 执行 request 请求
+      CompletableFuture<Object> responseFuture = currentClient.request(inv, timeout);
+      // 订阅response 结果
+      asyncRpcResult.subscribeTo(responseFuture);
+      // save for 2.6.x compatibility, for example, TraceFilter in Zipkin uses com.alibaba.xxx.FutureAdapter
+      FutureContext.getContext().setCompatibleFuture(responseFuture);
+      // 返回异步 rpc result
+      return asyncRpcResult;
+    }
+  } catch (TimeoutException e) {
+    throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Invoke remote method timeout. method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+  } catch (RemotingException e) {
+    throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+  }
+}
+```
+
+```java
+// AsyncRpcResult
+public void subscribeTo(CompletableFuture<?> future) {
+  // 等待结果
+  future.whenComplete((obj, t) -> {
+    if (t != null) {
+      this.completeExceptionally(t);
+    } else {
+      this.complete((Result) obj);
+    }
+  });
+}
 ```
 
