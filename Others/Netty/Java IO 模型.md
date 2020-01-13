@@ -28,3 +28,85 @@ NIO 同步非阻塞模型主要有三个核心组件： Channel，Buffer，Selec
 
 **Channel，Buffer，Selector关系：**每个 Channel 对应一个 Buffer，多个 Channel 可以注册到一个 Channel 上，每个Selector 对应一个线程。切换到哪个 Channel 是根据 Event 决定的，Event 就是一个重要的概念，Selector 会根据不同的 Event 在各个 Channel 上切换。Buffer 就是一个内存块，底层是一个数组。数据的读取写入都是通过 Buffer，BIO 中的流是单向的的，但是 NIO 的 Buffer 是双向的，既可以读也可以写可以通过 flip 方法切换。Channel 也是双向的，可以返回底层操作系统的情况。
 
+#### Buffer
+
+Buffer 即缓冲区，本质上就是一个可以读写的内存块，可以理解成一个容器对象，该对象提供了一组方法，可以更轻松的使用内存块，缓冲区对象内置了一些机制，能够跟踪和记录缓冲区的状态变化情况。Channel 提供从文件、网络读取数据的渠道，但是读取或者写入数据都必须经过 Buffer。
+
+![存储过程](http://img.programya.com/20200113194358.png)
+
+在 NIO 中 Buffer 是一个顶层父类，其实一个抽象类。常用的有 `ByteBuffer`, `ShortBuffer`， `CharBuffer`, `IntBuffer`, `LongBuffer`, `DoubleBuffer`,`FloatBuffer`。Buffer 类定义了所有缓冲区都具有的四个属性来提供关于其所包含的数据信息：
+
+```java
+// 标记，书签。
+private int mark = -1;
+// 下一个要被读或者写的元素的索引，每次读写缓冲区都会修改该值。为下次读写做准备。
+private int position = 0;
+// 表示缓冲区的当前终点，不能对缓冲区超过极限的位置进行读写操作。其可以修改。
+private int limit;
+// 容量，即可以容纳最大的数据量；在缓冲区创建时被设定且不能改变。
+private int capacity;
+```
+
+几个常用方法如下：
+
+```java
+// 获取最大容量
+public final int capacity();
+// 获取当前的位置
+public final int position();
+// 设置当前的位置
+public Buffer position(int newPosition);
+// 返回极限值
+public final int limit();
+// 设置极限值
+public Buffer limit(int newLimit);
+// 清空缓冲区
+public Buffer clear();
+// 翻转缓冲区
+public Buffer flip();
+// 缓冲区中是否还有剩余元素
+public final boolean hasRemaining();
+// 该缓冲区是否是只读的
+public abstract boolean isReadOnly();
+// 该缓冲区是否有具有可访问的底层实现数组。
+public abstract boolean hasArray();
+// 返回此缓冲区的底层实现数组
+public abstract Object array();
+```
+
+**ByteBuffer** 是最常用的，主要方法如下：
+
+```java
+// 创建直接缓冲区
+public static ByteBuffer allocate(int capacity);
+// 创建直接缓冲区
+public static ByteBuffer allocateDirect(int capacity);
+// 获取当前位置的元素
+public abstract byte get();
+// 获取指定位置的元素
+public abstract byte get(int index);
+// 从当前位置添加元素
+public abstract ByteBuffer put(byte b);
+// 在指定位置放置元素
+public abstract ByteBuffer put(int index, byte b);
+```
+
+#### Channel
+
+Channel 即通道，类似于流，但其可以同时进行读写，可以实现异步读写数据，可以从缓冲区读取数据也可以写数据到缓冲区中。常用的 Channel 类有 `FileChannel`  文件读写, `DatagramChannel` UDP 读写, `ServerSocketChannel`, `SocketChannel` TCP 读写。其中 `FileChannel` 是对本地文件进行 IO 操作，常用方法有：
+
+```java
+// 从 Channel 中读取数据并放到缓冲区中
+public abstract int read(ByteBuffer dst) throws IOException;
+// 把缓冲区的数据写到 Channel 中
+public abstract int write(ByteBuffer src) throws IOException;
+// 从目标 Channel 中复制数据到当前 Channel
+public abstract long transferFrom(ReadableByteChannel src, long position, long count);
+// 把数据从当前 Channel 复制到目标 Channel
+public abstract long transferTo(long position, long count, WritableByteChannel target);
+```
+
+
+
+
+
