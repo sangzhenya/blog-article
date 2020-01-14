@@ -106,6 +106,39 @@ public abstract long transferFrom(ReadableByteChannel src, long position, long c
 public abstract long transferTo(long position, long count, WritableByteChannel target);
 ```
 
+ByteBuffer 支持类型化的 put 和 get，put 的数据类型要和 get 使用的数据类型一致。否则则会抛出 `BufferUnderflowException` 异常。还可以将一个普通的 Buffer 转成只读 Buffer。NIO 还提供了 MappedByteBuffer 可以让文件直接在内存中进行修改（堆外内存），而如果同步到文件由 NIO 来完成。此外 NIO 还支持通过多个 Buffer 完成读写操作，即 Scattering 和 Gathering。
+
+![NIO 流程](http://img.programya.com/20200113233606.png)
+
+#### Selector
+
+Java 的 NIO 用阻塞式 IO 方法。如果用一个线程，处理多个客户端的连接就会使用到 Selector。Selector 能够检测多个注册的 Channel 上是否有 Event。多个 Channel 是以事件的方式注册到同一个 Selector。如果有 Event 则获取  Event 然后针对每个事件进行相应的处理。这样就可以只用一个线程管理多个 Channel。通过 Selector 只有在真正有读写 Event 时才会进行读写，所以就可以很大程度上减少系统的开销，并且不必为每个链接创建一个线程，不用去维护多线程，也避免了多线程之间的上下文切换的开销。
+
+Selector 类是一个抽象类，常用方法如下：
+
+```java
+// 获取一个选择器对象
+public static Selector open();
+// 监控所有注册的 Channel，当其中有 IO 操作的时候将对应的 SelectionKey 加入到内部集合
+// 并返回，通过参数可以设置超时时间
+public abstract int select(long timeout);
+public abstract int select();
+// 不阻塞
+public abstract int selectNow() throws IOException;
+// 从内部集合中的得到所有的 SelectionKey
+public abstract Set<SelectionKey> selectedKeys();
+// 唤醒 Selector
+public abstract Selector wakeup();
+```
+
+Selector，SelectionKey，ServerSocketChannel 和 SocketChannel 关系图如下：
+
+![关系图](http://img.programya.com/20200114213632.png)
+
+
+
+
+
 
 
 
