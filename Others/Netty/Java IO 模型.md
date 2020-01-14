@@ -135,6 +135,70 @@ Selector，SelectionKey，ServerSocketChannel 和 SocketChannel 关系图如下�
 
 ![关系图](http://img.programya.com/20200114213632.png)
 
+SelectionKey 表示 Selector 和 SocketChannel 的注册关系，公有四种：
+
+1. OP_READ：有写操作，值为1
+2. OP_WRITE：有写操作，值为 4
+3. OP_CONNECT：连接已经建立，值为 8
+4. OP_ACCEPT：有新的 Client 连接，值为 16
+
+主要方法有：
+
+```java
+// 得到与之关联的 Selector
+public abstract Selector selector();
+// 得到与之关联的 Channel
+public abstract SelectableChannel channel();
+// 得到与之关联的共享数据
+public final Object attachment();
+// 设置或改变监听事件
+public abstract SelectionKey interestOps(int ops);
+// 是否可以 accept
+public final boolean isAcceptable();
+// 是否可读
+public final boolean isReadable();
+// 是否可以写
+public final boolean isWritable();
+```
+
+ServerSocketChannel 在服务端监听新的客户端  Socket 连接，主要方法如下：
+
+```java
+// 得到一个 ServerSocketChannel 通道
+public static ServerSocketChannel open();
+// 设置服务器端口号
+public final ServerSocketChannel bind(SocketAddress local);
+// 设置阻塞或非阻塞模式，取值 false 表示采用非阻塞模式
+public final SelectableChannel configureBlocking(boolean block);
+// 接受一个连接，返回代表这个连接的通道对象
+public abstract SocketChannel accept();
+// 注册一个选择器并设置监听事件
+public final SelectionKey register(Selector sel, int ops);
+```
+
+SocketChannel 网络 IO 通道，负责具体读写操作。NIO 把 Buffer 的数据写入到 Channel，或者把 Channel 里的数据读到 Buffer 中。主要方法如下：
+
+```java
+// 得到一个 SocketChannel
+public static SocketChannel open();
+// 设置阻塞或非阻塞模式
+public final SelectableChannel configureBlocking(boolean block);
+// 连接服务器
+public abstract boolean connect(SocketAddress remote);
+// 连接失败的时候，可以通过该方法完成操作
+public abstract boolean finishConnect();
+// 往 Channel 中写数据
+public abstract int write(ByteBuffer src);
+// 从 Channel 中读数据
+public abstract int read(ByteBuffer dst);
+// 注册一个 Selector 并设置监听事件，最后一个参数可以设置共享数据。
+public abstract SelectionKey register(Selector sel, int ops, Object att);
+// 关闭通道
+public final void close();
+```
+
+
+
 
 
 
