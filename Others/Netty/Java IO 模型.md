@@ -12,7 +12,7 @@ Java 模型简单的理解就是使用什么样的通道惊醒数据的发送和
 
 **AIO** 是异步非阻塞模型，引入了异步通道的概念，采用了 Proactor 模型，简化程序的编写，有效的请求才会启动线程，特点是先由操作系统完成后才通知服务端程序启动线程去处理，一般适用于连接数较多且连接时间较长的应用。其适用于连接数目较多且连接较长的架构，重操作，例如相册服务器等。
 
-### Java NIO
+#### Java NIO
 
 NIO 同步非阻塞模型主要有三个核心组件： Channel，Buffer，Selector。其是面向缓冲区或者面向块编程的。数据读取到一个它稍后处理的缓冲区，需要时从缓冲区中前后移动，这就增加了处理过程中的灵活性，使用它可以提供非阻塞式的高伸缩性网络。流程如下：
 
@@ -197,13 +197,40 @@ public abstract SelectionKey register(Selector sel, int ops, Object att);
 public final void close();
 ```
 
+#### 零拷贝
+
+零拷贝是网络编程的关键，Java 程序中，常用的零拷贝有 mmap 内存映射和 sendFile 两种方式。以下分别是传统 IO。mmap 映射 和 sendFile 的 copy 过程图：
+
+传统 IO
+
+![传统 IO](http://img.programya.com/20200115204611.png)
+
+首先是从硬盘经过 DMA 拷贝 到 kernel buffer，然后从kernel buffer 经过cpu 拷贝到 user buffer ,比如拷贝到应用程序，然后从user buffer 拷贝到 socket buffer ，最后从socket buffer 拷贝到 protocol engine 协议栈，四个步骤。经过了用户态到内核态，内核态到用户态，用户态到内核态，最后由内核态回到用户态总共四次切换。
+
+Mmap 映射
+
+![mmap 映射](http://img.programya.com/20200115204358.png)
 
 
 
+mmap 通过内存映射，将文件映射到内核缓冲区，同时用户空间可以共享内核空间的数据。只需要从内核缓冲区拷贝到 Socket 缓冲区即可，这将减少一次内存拷贝（从 4 次变成了 3 次），但不减少上下文切换次数。但是不减少上下文切换的次数。
 
+sendFile
 
+![sendFile](http://img.programya.com/20200115204744.png)
 
+sendFile 的方式数据根本不经过用户态，直接从内核缓冲区进入到 Socket Buffer，由于和用户态完全无关，就减少了一次上下文切换。数据被 DMA 引擎从文件复制到内核缓冲区，然后调用，然后掉一共 write 方法时，从内核缓冲区进入到 Socket。在 Linux 2.4 中对 sendFile 进行了优化，避免了从内核缓冲区拷贝到 SocketBuff 的操作而是直接拷贝到协议栈，从而减少一次 Copy，如下所示：
 
+![sendFile](http://img.programya.com/20200115211703.png)
 
+mmap 和 sendFile 的区别如下：
 
+1. mmap 适合小数据量的读写，sendFile 适合大文件传输
+2. mmap 需要 4 次上下文切换，3 次数据拷贝；sendFile 需要 3 次上下文切换，最少需要 2 次数据拷贝。
+3. sendFile 使用 DMA 方式减少了 CPU 拷贝，mmap 则不能减少。
 
+所谓的零拷贝是从操作系统的角度来说，因为内核缓冲区之间没有数据是重复的，即只有 kernel buffer 一份数据。零拷贝能带来更少的数据复制还能带来其他的性能优势，例如更少的数据切换，更少的 CPU 缓存伪共享以及无 CPU 校验和计算。
+
+#### Java  AIO
+
+JDK 1.7 中引入了 Asynchronus I/O 即 AIO。在 IO 编程中，常用到两种模式：Reactor 和 Proactor。Java 的 NIO 就是 Reactor，当有事件触发的时候，服务器端得到通过，进行相应的处理。AIO 即 NIO 2.0 是异步不阻塞 IO，AIO 引入异步通道的概念，采用了Proactor 模式，简化了程序编写，有效的请求才启动线程，其特点是先由操作系统完成后才通知服务端程序启动线程处理，一般用于连接数较多且连接时间较长的应用。
