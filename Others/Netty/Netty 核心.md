@@ -112,8 +112,35 @@ ChannelFuture close();
 ChannelOutboundInvoker flush();
 // 将数据写到 ChannelPipeline 中，当前 ChannelHandler 的一个 ChannelHandler 开始处理
 ChannelFuture writeAndFlush(Object msg);
-
 ```
 
+### ChannelOption
 
+Netty 在创建 Channel 实例后一般都需要设置 ChannelOption 参数，常用的参数如下：
 
+```
+ChannelOption.SO_BACKLOG: 对应 TCP/IP 协议 listen 函数中的 backlog 函数，
+用来初始化服务器可连接队列大小。服务端处理客户端连接请求的是顺序处理的，所以同一时间
+职能处理一个客户端连接。多个客户端来的时候，服务端将不能处理的客户端连接放在队列中等待处理，
+backlog 指定队列的大小。
+ChannelOption.SO_KEEPALIVE: 一直保持连接活动状态。
+```
+
+### EventLoopGroup 和 NioEventLoopGroup
+
+EventLoopGroup 是一组 EventLoop 的抽象，Netty 为了更好的利用多核 CPU 资源，一般会有多个 EventLoop 同时工作，每个 EventLoop 维护一个 Selector 实例。其提供了一个 next 接口，可以从组里按照一定的规则获取其中一个 EventLoop 来处理任。在 Netty 服务器端编程中，一般需要提供两个 EventLoopGroup 例如：BossEventLoopGroup 和 WorkerEventLoopGroup。
+
+通常一个服务端口即一个 ServerSocketChannel 对应一个 Selector 和一个 EventLoop 线程。BossEventLoopGroup 负责客户端的连接并将 SocketChannel 交给 WorkerEventLoopGroup 来进行 IO 处理。
+
+BossEventLoopGroup 通常是一个单线程的 EventLoop，EventLoop 维护者一个注册了 ServerSocketChannel 的 Selector 实例。BossEventLoop 不断轮询 Selector 将连接事件分离出来，通常是 OP_ACCEPT 事件，然后接收到的 SocketChannel 交给 WorkerEventLoopGroup ，其会由 next 选择其中的一个 EventLoop 了将这个 SocketChannel 注册到其维护的 Selector 并对其后续 IO 事件进行处理。
+
+### Unpooled 
+
+Netty 提供的专门用来操作缓冲区的工具类，常用方法有：
+
+```java
+// 通过给定的数据和字符编码返回一个 ByteBuf 对象
+private static ByteBuf copiedBuffer(CharBuffer buffer, Charset charset);
+```
+
+创建 ByteBuf，该对象包含一个数组 arr，在 Netty 的 buffer 中不需要 flip 进行反转，底层维护了 readerIndex， writerIndex 和 capacity 将 buffer 分成三个区域： 0 到 readerIndex 已经读取的区域；readerIndex  到 writerIndex 可读区域；writerIndex 才 capacity 可写区域。
