@@ -144,3 +144,10 @@ private static ByteBuf copiedBuffer(CharBuffer buffer, Charset charset);
 ```
 
 创建 ByteBuf，该对象包含一个数组 arr，在 Netty 的 buffer 中不需要 flip 进行反转，底层维护了 readerIndex， writerIndex 和 capacity 将 buffer 分成三个区域： 0 到 readerIndex 已经读取的区域；readerIndex  到 writerIndex 可读区域；writerIndex 才 capacity 可写区域。
+
+### 编解码
+
+编写网络应用程序时，因为数据在网络中传输的都是二进制字节码数据，在发送数据时就需要编码，接收数据时就需要解码。 Codec 的组成部分有两个：decoder(解码器) 和 encoder(编码器)；encoder 复杂把业务数据转换成字节码数据，decoder 负责把字节码数据转换成业务数据。Netty 自身提供了一些 codec(编解码器)，例如 StringEncoder 对字符串数据进行编码，ObjectEncoder 对 Java 对象进行编码。StringDecoder 对字符串进行解码，ObjectEncoder 对 Java 对象进行解码。
+
+Netty 的 ObjectDecoder 和 ObjectEncoder 可以用来实现 POJO 对象或各种业务对象的变暗和解码，底层使用的仍是 Java 序列化技术，而 Java 序列化技术本身效率不高且存在无法跨语言，序列化后提交太大，序列化性能太低。
+
