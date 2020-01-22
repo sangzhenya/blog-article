@@ -26,7 +26,9 @@ public final class EchoServer {
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
              .option(ChannelOption.SO_BACKLOG, 100)
+              // ServerSocketChannel Handler
              .handler(new LoggingHandler(LogLevel.INFO))
+              // SocketChannel Handler
              .childHandler(new ChannelInitializer<SocketChannel>() {
                  @Override
                  public void initChannel(SocketChannel ch) {
@@ -39,10 +41,10 @@ public final class EchoServer {
                  }
              });
 
-            // Start the server.
+            // 绑定端口并等待完成
             ChannelFuture f = b.bind(PORT).sync();
 
-            // Wait until the server socket is closed.
+            // 等待 Channel 关闭
             f.channel().closeFuture().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
@@ -403,6 +405,47 @@ private void invokeBind(SocketAddress localAddress, ChannelPromise promise) {
   } else {
     bind(localAddress, promise);
   }
+}
+```
+
+通过 NIO 的 SelectorProvider 和 openServerSocketChannel 方法得到 JDK 的 Channel，Netty 会包装 JDK 的Channel。创建一个唯一的 ChannelId，创建一个 NioMessageUnsafe 用于操作消息，创建了一个 DefaultChannelPipeline 管道，是一个双向链表，用于过滤所有进出的消息。创建一个 NioServerSocketChannelConfig 对象，用于对外展示一些配置。
+
+```java
+private static ServerSocketChannel newSocket(SelectorProvider provider) {
+  try {
+    // 通过 SelectorProvider 开启一个 ServerSocketChannel
+    return provider.openServerSocketChannel();
+  } catch (IOException e) {
+    throw new ChannelException(
+      "Failed to open a server socket.", e);
+  }
+}
+```
+
+```java
+public ServerSocketChannel openServerSocketChannel() throws IOException {
+ 	// 创建 ServerSocketChannel
+  return new ServerSocketChannelImpl(this);
+}
+```
+
+```java
+protected AbstractChannel(Channel parent) {
+  this.parent = parent;
+  // 创建 ID
+  id = newId();
+  // 创建 NioMessageUnsafe
+  unsafe = newUnsafe();
+  // 创建 DefaultChannelPipeline
+  pipeline = newChannelPipeline();
+}
+```
+
+```java
+public NioServerSocketChannel(ServerSocketChannel channel) {
+    super(null, channel, SelectionKey.OP_ACCEPT);
+  	// 创建 NioServerSocketChannelConfig
+    config = new NioServerSocketChannelConfig(this, javaChannel().socket());
 }
 ```
 
