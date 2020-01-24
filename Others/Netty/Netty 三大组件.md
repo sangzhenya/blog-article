@@ -178,4 +178,47 @@ private void addLast0(AbstractChannelHandlerContext newCtx) {
 
 ### ChannelPipeline 调度 handler 流程
 
-首先当一个请求进来的时候，会第一个调用 pipeline 的相关方法，如果是入站事件这些方法由 fire 开头，表示开始管道的流动，让后面的 handler 继续处理。
+首先当一个请求进来的时候，会第一个调用 pipeline 的相关方法，如果是入站事件这些方法由 fire 开头，表示开始管道的流动，让后面的 handler 继续处理。 DefaultChannelPipeline 中的一个 inbound 方法如下：
+
+```java
+public final ChannelPipeline fireChannelRead(Object msg) {
+  // 从 head 开始处理
+  AbstractChannelHandlerContext.invokeChannelRead(head, msg);
+  return this;
+}
+static void invokeChannelRead(final AbstractChannelHandlerContext next, Object msg) {
+  final Object m = next.pipeline.touch(ObjectUtil.checkNotNull(msg, "msg"), next);
+  EventExecutor executor = next.executor();
+  if (executor.inEventLoop()) {
+    // 如果是当前的 EventLoop group 则直接调用 ChannelRead 方法
+    next.invokeChannelRead(m);
+  } else {
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        next.invokeChannelRead(m);
+      }
+    });
+  }
+}
+private void invokeChannelRead(Object msg) {
+  if (invokeHandler()) {
+    try {
+      // 如果是 inbound 则直接调用 channelRead 方法
+      ((ChannelInboundHandler) handler()).channelRead(this, msg);
+    } catch (Throwable t) {
+      notifyHandlerException(t);
+    }
+  } else {
+    // 否则找下一个 handler
+    fireChannelRead(msg);
+  }
+}
+```
+
+fire 这些都是 inbound 的方法，从 head 开始处理，这些静态方法则会调用 ChannelInboundInvoker 接口的方法，然后调用 handler 的真正方法。对于 outbound 的方法，则是从 tail 开始处理。
+
+入站是 head 开始，出站时 tail 开始，因为出站时从内部向外部写，从 tail 开始能够让前面的 handler 进行处理，防止 handler 遗漏；反之入站是从 head 往内部输入，让后面的 handler 能够处理这些数据。虽然 head 也实现了 outbound 接口，但是不从 head 开始执行出站任务。
+
+
+
