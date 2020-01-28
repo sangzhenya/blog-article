@@ -219,6 +219,3 @@ private void invokeChannelRead(Object msg) {
 fire 这些都是 inbound 的方法，从 head 开始处理，这些静态方法则会调用 ChannelInboundInvoker 接口的方法，然后调用 handler 的真正方法。对于 outbound 的方法，则是从 tail 开始处理。
 
 入站是 head 开始，出站时 tail 开始，因为出站时从内部向外部写，从 tail 开始能够让前面的 handler 进行处理，防止 handler 遗漏；反之入站是从 head 往内部输入，让后面的 handler 能够处理这些数据。虽然 head 也实现了 outbound 接口，但是不从 head 开始执行出站任务。
-
-
-
