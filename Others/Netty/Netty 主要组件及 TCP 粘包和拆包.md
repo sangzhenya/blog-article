@@ -2,7 +2,7 @@
 
 Netty 的主要组件有 Channel， EventLoop，ChannelFuture，ChannelHandler，ChannelPipeline 等。
 
-### Netty 主要组件
+### ChannelHandler
 
 其中 ChannelHandler 是处理出入站数据的业务逻辑容器。例如通过实现 ChannelInboundHandler 接口，就可以接收入站事件和数据。当要给客户端端发送响应的时候，也可以从 ChannelInboundHandler 中写数据。业务逻辑通常写在一个或多个 ChannelInboundHandler 中。ChannelOutboundHanlder 类似，只是其用来处理出站数据的。
 
