@@ -57,7 +57,7 @@ public final class EchoServer {
 
 在配置 Server 中两个是 EventLoopGroup 是核心对象，其中 bossGroup 用于接收 TCP 请求，然后转发给 workerGroup，workerGroup 会获取到真正的连接并和连接进行通讯，例如读写解编码。其中 EventLoopGroup 是事件循环组即线程组，含有多个 EventLoop，可以注册 Channel，用于在事件循环中进行选择。如下图所示：
 
-![image-20200122005440647](/Users/xinyue/Library/Application Support/typora-user-images/image-20200122005440647.png)
+![](http://img.programya.com/image-20200122005440647.png)
 
 EventLoopGroup 创建的时候其父类 MultithreadEventLoopGroup 中的构造方法，如下：
 
@@ -159,7 +159,7 @@ protected EventLoop newChild(Executor executor, Object... args) throws Exception
 
 NioEventLoop 和 NioEventLoopGroup 的类继承关系如下：
 
-![image-20200122011533509](/Users/xinyue/Library/Application Support/typora-user-images/image-20200122011533509.png)
+![](http://img.programya.com/image-20200122011533509.png)
 
 除了两个 EventLoopGroup 外还有一个 ServerBootstrap 对象，其是一个引导类，用于启动服务器和引导整个程序的初始化，其和 ServerChannel 关联，ServerChannel 是 Channel 的子接口。
 
