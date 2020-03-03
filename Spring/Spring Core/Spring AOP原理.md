@@ -64,7 +64,7 @@ private static BeanDefinition registerOrEscalateApcAsRequired(
 
 `AnnotationAwareAspectJAutoProxyCreator` 实现了 `BeanPostProcessor` 是一个后置处理器，且实现了`BeanFactoryAware` 可以拿到 Bean 工厂。
 
-![类结构]( http://img.sangzhenya.com/Snipaste_2019-11-19_23-08-05.png )
+![类结构]( http://img.programya.com/Snipaste_2019-11-19_23-08-05.png )
 
 **首先看一下获取 `BeanFactory` 的过程如下：**
 
@@ -447,7 +447,7 @@ public Object getProxy(@Nullable ClassLoader classLoader) {
 
 例如调用 `Message.sayHello` 方法，在获取到 Bean 的时候发现已经是代理之后的对象了 ，如下图所示:
 
-![被代理的对象]( http://img.sangzhenya.com/Snipaste_2019-11-21_23-18-48.png )
+![被代理的对象]( http://img.programya.com/Snipaste_2019-11-21_23-18-48.png )
 
 首先是 `CglibAopProxy.DynamicAdvisedInterceptor` 中的 `intercept ` 方法
 
@@ -505,7 +505,7 @@ public Object intercept(Object proxy, Method method, Object[] args, MethodProxy 
 
 上图中获取的拦截器链如下，其实就是定义的切面方法。
 
-![拦截链]( http://img.sangzhenya.com/Snipaste_2019-11-23_12-17-05.png )
+![拦截链]( http://img.programya.com/Snipaste_2019-11-23_12-17-05.png )
 
 获取拦截器链的方法如下：
 ```java

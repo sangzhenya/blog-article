@@ -4,7 +4,7 @@
 
 索引是帮助 MySQL 高效获取数据的数据结构，即本质上就是一种数据结构。数据库在存储数据之外还维护者满足特定查找算法的数据结构，这些数据结构以某种方式引用数据，这样就可以在数据结构上实现高级的查找算法，一种索引方式如下图所示：
 
-![索引](http://img.sangzhenya.com/Snipaste_2019-10-13_17-26-48.png)
+![索引](http://img.programya.com/Snipaste_2019-10-13_17-26-48.png)
 
 一般来说索引文件本身也很大，所以并不会全部存储在内存中，往往以索引文件的形式存储在磁盘上。
 
@@ -34,7 +34,7 @@
 
 B+ 树是 B 树的一种变形，非叶子节点只保存索引，不保存实际数据，数据都保存在叶子节点。形式如下图所示：
 
-![B+ 树](http://img.sangzhenya.com/Snipaste_2019-10-13_17-40-22.png)
+![B+ 树](http://img.programya.com/Snipaste_2019-10-13_17-40-22.png)
 
 使用 B+ 树的原因主要有以下几点。
 
@@ -88,7 +88,7 @@ show index from table_name;
 
 使用 Explain 可以模拟优化器执行 SQL 查询语句，从而知道MySQL 是如何处理 SQL 的，进而分析查询语句或者表结构的性能瓶颈。主要可以查询表的读取顺序，数据读取操作的操作类型，哪些索引可以被使用，哪些索引实际被使用，表之间的引用，每张表有多少行被优化器查询等。主要包含以下内容：
 
-![Explain 查询内容](http://img.sangzhenya.com/Snipaste_2019-10-14_22-16-36.png)
+![Explain 查询内容](http://img.programya.com/Snipaste_2019-10-14_22-16-36.png)
 
 #### id
 
@@ -100,7 +100,7 @@ show index from table_name;
 explain select ce.id, ac.id from category ce where ce.id in (select ac.category_id from article ac);
 ```
 
-![Explain ID 1](http://img.sangzhenya.com/Snipaste_2019-10-14_22-58-45.png)
+![Explain ID 1](http://img.programya.com/Snipaste_2019-10-14_22-58-45.png)
 
 ##### id 不同
 
@@ -110,7 +110,7 @@ explain select ce.id, ac.id from category ce where ce.id in (select ac.category_
 explain select ac.title from article ac where ac.category_id = (select ce.id from category ce where ce.id = 61);
 ```
 
-![id 不同](http://img.sangzhenya.com/Snipaste_2019-10-14_23-07-13.png)
+![id 不同](http://img.programya.com/Snipaste_2019-10-14_23-07-13.png)
 
 ##### id 不同和相同同时存在
 

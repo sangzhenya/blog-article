@@ -69,7 +69,7 @@ EntityManager 主要有以下几个方法:
 
 用于处理 Entity 的同步即数据库的插入和更新操作。具体流程如下：
 
-![Merge 流程](http://img.sangzhenya.com/Snipaste_2019-12-21_15-28-47.png)
+![Merge 流程](http://img.programya.com/Snipaste_2019-12-21_15-28-47.png)
 
 **flush**
 

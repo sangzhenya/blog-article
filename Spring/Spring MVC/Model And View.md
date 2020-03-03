@@ -2,7 +2,7 @@
 
 
 
-![ModelAndView](http://img.sangzhenya.com/Snipaste_2019-12-13_16-49-52.png)
+![ModelAndView](http://img.programya.com/Snipaste_2019-12-13_16-49-52.png)
 
 Spring MVC 在 `ModelAndView` 上添加数据主要以下三个方法：
 

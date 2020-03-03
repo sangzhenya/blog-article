@@ -8,17 +8,17 @@
 
 可以从官网 [ActiveMQ](https://activemq.apache.org/) 下, 解压缩后进入到 bin 目录下，运行 `activemq.bat start` 运行 ActiveMQ，默认进程端口是 61616，默认控制台地址是  http://localhost:8161/index.html，打开控制台地址显示下图则表明已经安装成功了。
 
-![控制台](http://img.sangzhenya.com/Snipaste_2019-10-22_20-41-08.png)
+![控制台](http://img.programya.com/Snipaste_2019-10-22_20-41-08.png)
 
 使用默认的用户名和密码 `admin/admin` 进入控制台，显示如下：
 
-![控制台](http://img.sangzhenya.com/Snipaste_2019-10-22_20-43-29.png)
+![控制台](http://img.programya.com/Snipaste_2019-10-22_20-43-29.png)
 
 ### Java 编码实现
 
 通用开发步骤
 
-![JMS](http://img.sangzhenya.com/Snipaste_2019-10-22_21-20-48.png)
+![JMS](http://img.programya.com/Snipaste_2019-10-22_21-20-48.png)
 
 
 
@@ -36,7 +36,7 @@
 
 #### Queue
 
-![Queue](http://img.sangzhenya.com/Snipaste_2019-10-22_21-54-15.png)
+![Queue](http://img.programya.com/Snipaste_2019-10-22_21-54-15.png)
 
 每个消息只能有一个消费者，一对一的关系，消息生产者和消费者之间上没有相关性，无论消费者在生产者发送消息的是否在线，消费者都可以提取消息。消息被消费后不会再存储，所以消费者不会消费已经被消费的消息。
 
@@ -101,7 +101,7 @@ public class QConsumer {
 
 #### Topic
 
-![Topic](http://img.sangzhenya.com/Snipaste_2019-10-22_21-55-45.png)
+![Topic](http://img.programya.com/Snipaste_2019-10-22_21-55-45.png)
 
 ##### Producer
 

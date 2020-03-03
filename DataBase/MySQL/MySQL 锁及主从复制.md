@@ -16,7 +16,7 @@
 
 通过命令 `show open tables` 可以查看哪些表被加锁，通过 `show status like 'table%';` 命令查看表锁定概况。其中 `Table_locks_immediate` 产生表级锁定的次数，可以立即获取锁的查询次数，每次立即获取锁值加 1， `Table_locks_waited` 出现表级锁定争用而发生等待的次数，每等待一次锁值加1。
 
-![表锁定概况](http://img.sangzhenya.com/Snipaste_2019-10-20_10-52-59.png)
+![表锁定概况](http://img.programya.com/Snipaste_2019-10-20_10-52-59.png)
 
 通过 `lock table tableA read;` 为表 tableA 加上 读锁。当前 session 在加锁之后，解锁之前，不能操作执行插入或更新操作，同时也不能操作未被当前锁锁的表，例如操作 tableB。其他session 可以读tableA，但是如果尝试更新 tableA 则会进入到等待状态，直到当前 session 使用 `unlock tables` 解除当前表的锁。
 
@@ -28,7 +28,7 @@
 
 通过命令 `show status like 'innodb_row_lock%';` 查看行锁使用情况。其中 `Innodb_row_lock_current_waits` 当前正等待锁定的数量；`Innodb_row_lock_time` 从系统启动当现在锁定总时间长度；`Innodb_row_lock_time_avg` 每次等待所花的平均时间；`Innodb_row_lock_time_max` 从系统启动到现在等待最长的一次所花的时间；`Innodb_row_lock_waits` 系统启动到现在总共等待的次数。
 
-![行锁使用情况](http://img.sangzhenya.com/Snipaste_2019-10-20_11-22-50.png)
+![行锁使用情况](http://img.programya.com/Snipaste_2019-10-20_11-22-50.png)
 
 在默认的隔离级别  REPEATABLE-READ 的情况下（可以通过 `show variables like 'tx_isolation';` 查看隔离级别），在更新 SQL 执行之后，commit 之前对当前行的数据都持有行锁。此时其他 session 操作同一行的数据会进入等待状态，直到超时或者当前 session 执行 commit 操作。此时也只有当前 session 可以读取到更新的数据，其他 session 只能读取当旧的数据。
 
@@ -48,7 +48,7 @@
 2. Slave 将 Master 的 binary log events 复制到自己的中继日志 relay log.
 3. Slave 重做中继日志中的事件，将改变应用到自己的数据库中，MySQL 复制是异步且串行化的。
 
-![原理图](http://img.sangzhenya.com/Snipaste_2019-10-20_13-53-35.png)
+![原理图](http://img.programya.com/Snipaste_2019-10-20_13-53-35.png)
 
 Master 和 Slave 的关系是一对多，每个 Slave 只有一个唯一的服务器 ID。
 

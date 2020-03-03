@@ -122,7 +122,7 @@ public class MyJpa {
 
 最后打开数据库查看数据已经存储到表中了：
 
-![数据库结果](http://img.sangzhenya.com/Snipaste_2019-12-21_10-48-28.png)
+![数据库结果](http://img.programya.com/Snipaste_2019-12-21_10-48-28.png)
 
 在 Book 这个实体类中可以看到几个相关的注解：
 

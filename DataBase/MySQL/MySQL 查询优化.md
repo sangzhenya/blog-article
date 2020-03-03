@@ -4,7 +4,7 @@
 
 MySQL 架构图如下：
 
-![MySQL 架构图](http://img.sangzhenya.com/Snipaste_2019-10-19_21-50-19.png)
+![MySQL 架构图](http://img.programya.com/Snipaste_2019-10-19_21-50-19.png)
 
 #### 连接层
 
@@ -33,7 +33,7 @@ show engines;
 show variables like '%storage_engine%';
 ```
 
-![查询使用的存储引擎](http://img.sangzhenya.com/Snipaste_2019-10-19_22-12-47.png)
+![查询使用的存储引擎](http://img.programya.com/Snipaste_2019-10-19_22-12-47.png)
 
 MyISAM 和 InnoDB 的对比：
 
@@ -52,7 +52,7 @@ Windows 环境下默认配置文件是在 MySQL 安装目录下的 `my.ini` 文�
 
 数据库编码设置：可以通过 `show variables like '%char%';` 命令查看当前数据的字符集编码方式设置情况。
 
-![数据库字符集](http://img.sangzhenya.com/Snipaste_2019-10-20_08-47-30.png)
+![数据库字符集](http://img.programya.com/Snipaste_2019-10-20_08-47-30.png)
 
 可以通过配置以上的参数设置数据库的默认编码：
 
@@ -87,7 +87,7 @@ default-character-set=utf8
 
 MySQL 的慢日志是 MySQL 提供的一种日志记录，它用量记录在 MySQL 中响应时间超过阈值的语句，即运行时间超过 `long_query_time` 值的 SQL，该值默认是 10，即运行在 10s 以上的语句。默认情况是不开启的，需要手工设置。通过 `show variables like '%slow_query_log%';` 查看慢日志状态，命令行中通过 `set gloable slow_query_log = 1;` 开启慢日志，仅针对当前数据的本次运行开启。可以在 `my.ini` 中配置永久开启。通过 `show global status like '%slow_queries%';` 可以查询 slow sql 的数量。此外 MySQL 提供了 mysqldumpslow 工具用于更好代分析慢日志文件。
 
-![慢日志状态](http://img.sangzhenya.com/Snipaste_2019-10-20_09-44-15.png)
+![慢日志状态](http://img.programya.com/Snipaste_2019-10-20_09-44-15.png)
 
 ```properties
 [mysqld]
@@ -106,7 +106,7 @@ log_output=FILE
 
 show profile 是 MySQL 提供的可以用来分析当前会话中语句执行的资源消耗情况，用于 SQL 调优的测量。默认是关闭的，开启后默认保存最近 15 的结果。可以通过 `show variables like 'profiling';` 命令查看状态，通过 `set profiling=on;` 开启，同样可以在 配置文件中设置永久开启。通过命令 `show profiles;` 命令查看运行的命令。
 
-![show profile 命令](http://img.sangzhenya.com/Snipaste_2019-10-20_10-08-27.png)
+![show profile 命令](http://img.programya.com/Snipaste_2019-10-20_10-08-27.png)
 
 通过 `show profile cpu, block io for query [queryId];` 具体分析 SQL 执行情况。	其中主要有以下参数：
 

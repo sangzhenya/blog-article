@@ -24,7 +24,7 @@ public class MyApplicationListener implements ApplicationListener<ApplicationEve
 
 包含容器刷新完成的时间和容器关闭的事件，预设的几种 ApplicationEvent 如下图所示：
 
-![几种 ApplicationEvent]( http://img.sangzhenya.com/Snipaste_2019-11-25_21-15-17.png )
+![几种 ApplicationEvent]( http://img.programya.com/Snipaste_2019-11-25_21-15-17.png )
 
 也可以自己添加自己定义的事件，如下所示：
 ```java

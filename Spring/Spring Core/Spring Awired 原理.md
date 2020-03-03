@@ -19,7 +19,7 @@ public class CustomContext implements ApplicationContextAware {
 
 调用过程如下图所示：
 
-![调用过程]( http://img.sangzhenya.com/Snipaste_2019-11-17_06-56-54.png )
+![调用过程]( http://img.programya.com/Snipaste_2019-11-17_06-56-54.png )
 
 在容器启动的时候会调用  `refresh` 方法刷新容器，调用 `finishBeanFactoryInitialization` 方法初始化所有非 Lazy 的 Bean，会经过经过下面的一系列的方法 `beanFactory.preInstantiateSingletons()` ， `doGetBean`，`getSingleton`， `createBean` 进行处理，冻结 config，尝试获取 bean，在获取不到的情况下去创建 Bean 对象。在 `doCreateBean` 方法中真正的去创建 Bean 对象，在初始化 bean 的 `initializeBean` 方法中会调用到 `applyBeanPostProcessorsBeforeInitialization` 方法，就是在 Bean 初始化之前应用后置处理器。
 
@@ -112,7 +112,7 @@ private ContextDependence contextDependence;
 
 注入的调用方法栈如下：
 
-![Autowired 调用栈]( http://img.sangzhenya.com/Snipaste_2019-11-17_07-39-32.png )
+![Autowired 调用栈]( http://img.programya.com/Snipaste_2019-11-17_07-39-32.png )
 
 前期过程基本和上面类似，首先调用容器 `refresh` 方法刷新容器，在此过程中调用 `finishBeanFactoryInitialization` 方法初始化所有非 Lazy 的 Bean。之后调用 `beanFactory.preInstantiateSingletons()` ，`getBean`，`doGetBean`，`getSingleton` ，`createBean` 去 尝试获取 Bean, 获取不到在进行创建。`doCreateBean` 真正的去创建 Bean，在其中 `populateBean` 方法为 Bean 添加相关的属性包括依赖注入，调用后置处理器的去处理 Bean，其中包含 `AutowiredAnnotationBeanPostProcessor` ，其 `postProcessProperties` 方法中去注入依赖：
 

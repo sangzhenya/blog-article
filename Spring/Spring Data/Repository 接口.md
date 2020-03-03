@@ -4,7 +4,7 @@ Spring Data 用于简化数据库访问，能够减少数据访问层的开发�
 
 `Repository` 是一个空接口即标记接口，如果定义的接口继承了 `Repository` 则该接口会被 IOC 容器识别成一个 `Repository Bean` 纳入到 IOC 容器中，进而可以在该接口中定义满足一定规范的方法。也可以使用 `@RepositoryDefinition` 注解代替。其继承体系如下：
 
-![Repository 继承体系](http://img.sangzhenya.com/Snipaste_2019-12-22_21-15-39.png)
+![Repository 继承体系](http://img.programya.com/Snipaste_2019-12-22_21-15-39.png)
 
 其中：
 

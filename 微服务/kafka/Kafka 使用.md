@@ -4,7 +4,7 @@
 
 Kafka 的 Producer 发送消息时采用异步发送的方式，在消息的发送过程中，涉及到了两个线程， main 线程和 sender 线程，以及一个线程共享变量 `RecordAccumulator` main 线程将消息发送给 `RecordAccumulator` Sender 线程不断从  `RecordAccumulator` 中拉取消息发送到 Kafka Broker 上。如下图所示：
 
-![发送流程](http://img.sangzhenya.com/Snipaste_2019-11-15_15-27-35.png)
+![发送流程](http://img.programya.com/Snipaste_2019-11-15_15-27-35.png)
 
 ```java
 // 一个简单的 Producer
@@ -217,7 +217,7 @@ properties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, Arrays.asList("com.xin
 
 Kafka Eagle 界面如下图所示：
 
-![Eagle 界面](http://img.sangzhenya.com/Snipaste_2019-11-16_00-32-15.png)
+![Eagle 界面](http://img.programya.com/Snipaste_2019-11-16_00-32-15.png)
 
 修改 `kafka.server.start.sh` 文件：
 
@@ -256,6 +256,6 @@ kafka.eagle.password=000000
 
 通过 `./ke.sh start` 命令启动，如下图所示：
 
-![启动成功标志](http://img.sangzhenya.com/Snipaste_2019-11-16_00-38-07.png)
+![启动成功标志](http://img.programya.com/Snipaste_2019-11-16_00-38-07.png)
 
 登录即可查看相应的状态信息

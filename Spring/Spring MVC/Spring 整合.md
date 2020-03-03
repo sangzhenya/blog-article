@@ -53,7 +53,7 @@ public class SpringServletContainerInitializer implements ServletContainerInitia
 
 默认有 4 个抽象类实现了 `WebApplicationInitializer` 接口，如下图所示：
 
-![WebApplicationInitializer](http://img.sangzhenya.com/Snipaste_2019-11-30_19-22-35.png)
+![WebApplicationInitializer](http://img.programya.com/Snipaste_2019-11-30_19-22-35.png)
 
 最底层的 `AbstractAnnotationConfigDispatcherServletInitializer` 中并没有对 `onStartup` 方法重写，所以看 `AbstractDispatcherServletInitializer` 类，其重写了 父类的 `onStartup` 方法，如下所示：
 
@@ -575,7 +575,7 @@ protected void configureAndRefreshWebApplicationContext(ConfigurableWebApplicati
 
 通过以上的分析，清楚以注解的方法启动 SpringMVC 需要继承 `AbstractAnnotationConfigDispatcherServletInitializer` 类。实现其抽象方法指定 `DispatcherServlet` 的信息，同时指定两个容器分别管理 Web Bean 和 其他 Bean，如下图所示：
 
-![Spring MVC 容器](http://img.sangzhenya.com/Snipaste_2019-11-30_20-26-43.png)
+![Spring MVC 容器](http://img.programya.com/Snipaste_2019-11-30_20-26-43.png)
 
 主要代码如下：
 
@@ -652,7 +652,7 @@ public class DemoService {
 
 测试结构如下：
 
-![测试结果](http://img.sangzhenya.com/Snipaste_2019-11-30_22-57-26.png)
+![测试结果](http://img.programya.com/Snipaste_2019-11-30_22-57-26.png)
 
 
 
