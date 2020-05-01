@@ -26,7 +26,52 @@ bind C-a send-prefix
 
 ### Session
 
+```bash
+tmux # 创建一个无名称 session，tmux 会自动分配一个编号
+tmux new -s temp # 创建命名为 temp 的 session
+tmux rename-session -t 0 temp # 重命名一个 session
+<prefix> + d # 断开当前会话，同 tmux detach 命令
+tmux a # 进入第一个 session
+tmux a -t temp # 进入指定名称的 session
+tmux kill-session -t temp # 关闭名称为 temp 的 session
+tmux kill-server # 关闭 Server
+<prefix> + s # 查看所有的 session，也可以使用 tmux ls 命令
+tmux switchc -t temp # 切换到指定的 session
+<prefix> + $ # 重命名当前 session
+```
+
 ### Window
+
+```bash
+<prefix> c # 创建 window
+tmux new-window -n t-win # 创建一个命名 window
+<prefix> + [number] # 选择第 n 个 window
+<prefix> + p/n # 选择上一个或下一个 window
+<prefix> + & # 关闭 window 同 exit 
+<prefix> + w # 列出所有 window 然后进行选择，通过 j/k 前后选择
+<prefix> + f # 搜索 window
+<prefix> + , # 重命名当前 window 同 tmux rename-window 
+```
 
 ### Panel
 
+```bash
+<prefix> + % # 水平分割
+<prefix> + \" # 垂直分割
+<prefix> + ; # 光标移动到上一个 panel
+<prefix> + o # 光标移动到下一个 panel
+<prefix> + q # 显示 panel 序号进行切换
+<prefix> + b # 关闭当前 panel
+<prefix> + ! # 将当前 panel 移动到新的 window
+<prefix> + {/} # 当前 panel 左移/右移
+<prefix> + Ctrl + o # 当前 panel 上移
+<prefix> + Alt + o # 当前 panel 下移
+```
+
+### 其他快捷键
+
+```bash
+tmux list-keys # 列出所有的 keys
+tmux list-commands # 列出所有的命令
+tmux info # 当前 session 的信息
+```
