@@ -44,7 +44,7 @@ git reflog # 记录每一次的 git 命令
 
 git rm <file> # 从版本库中删除文件
 git rm -f <file> # 同时从工作区和暂存区删除指定的文件
-git rm --cached <file> # 从暂存区删除指定的文件
+git rm --cached <file> # 从暂存区删除指定的文件, 删除已经跟踪的文件
 
 git remote add origin <远程仓库地址> # 添加远程仓库地址，origin 就是远程库
 git clone <远程仓库地址>  # 从远程地址 clone 仓库
