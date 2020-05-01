@@ -1,7 +1,5 @@
 ## Nginx proxy pass, root alias
 
-[TOC]
-
 ### proxy_pass
 proxy_pass 一般有四种设置方式, 例如访问 index.html 页面：
 
@@ -11,6 +9,7 @@ location /proxy/ {
     proxy_pass http://127.0.0.1/;
 }
 ```
+
 2 代理 URL： http://127.0.0.1/proxy/index.html
 ```nginx
 location /proxy/ {
@@ -23,6 +22,7 @@ location /proxy/ {
     proxy_pass http://127.0.0.1/demo/;
 }
 ```
+
 4 代理 URL：http://127.0.0.1/proxy/demo/index.html
 ```nginx
 location /proxy/ {
@@ -81,9 +81,9 @@ location ^~ demo/ {
 ```
 这样的规则是无法被匹配到，会走全局的 root 规则。
 
-所以对于对于匹配的地址，会将 url 中路径拼接上 rule 中配置的 路径就得到了真实页面的地址。如果找不到 rule 则使用默认的 root。
+**所以对于匹配的地址，会将 url 中路径拼接上 rule 中配置的 路径就得到了真实页面的地址。** 如果找不到 rule 则使用默认的 root。
 
-对于 alias 来说是使用 alias 后的值替换匹配的 URL 的路径得到真实页面的地址，例如访问 `localhost/demo/demo.html`
+**对于 alias 来说是使用 alias 后的值替换匹配的 URL 的路径得到真实页面的地址，** 例如访问 `localhost/demo/demo.html`
 例如以下几条rule, 规则如下：
 ```nginx
 #config 1
