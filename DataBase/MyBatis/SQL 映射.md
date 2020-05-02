@@ -1,4 +1,4 @@
-## SQL 映射
+## MyBatis SQL 映射
 
 一个包含增删改查的 MyBatis Mapper 文件如下：
 

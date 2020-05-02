@@ -1,4 +1,4 @@
-## 动态 SQL
+## MyBatis 动态 SQL
 
 使用 MyBatis 可以很轻松的完成动态 SQL 的拼写。
 

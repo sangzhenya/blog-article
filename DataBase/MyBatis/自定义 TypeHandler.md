@@ -1,4 +1,4 @@
-## 自定义 TypeHandler
+## MyBaits 自定义 TypeHandler
 
 MyBaits 支持通过自定义的 TypeHandler 的形式来设置参数或从结果中取出数据集的时候的封装策略。主要有以下几步：
 
