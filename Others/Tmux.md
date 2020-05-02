@@ -75,3 +75,5 @@ tmux list-keys # 列出所有的 keys
 tmux list-commands # 列出所有的命令
 tmux info # 当前 session 的信息
 ```
+
+参考：[Tmux 使用教程](https://www.ruanyifeng.com/blog/2019/10/tmux.html)

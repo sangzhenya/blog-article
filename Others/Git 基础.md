@@ -91,6 +91,16 @@ git push origin master --tags # 将所有标签提交到远程仓库
 git push origin :refs/tags/v1.0 # 删除远程仓库的 tag
 ```
 
+*几个缩写*
+
+```bash
+# type gaa 查看缩写
+gaa # git add --all
+gcmsg # git commit -m
+gp # git push
+```
+
+
 ## Git 其他操作
 
 ### Git 忽略文件
