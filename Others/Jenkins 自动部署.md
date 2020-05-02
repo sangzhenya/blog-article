@@ -30,7 +30,7 @@ sudo docker run -d -p 8081:8081 --name blog -t blog # 启动镜像，即根据�
 
 ![GitHub 中 webhook 设置](https://i.loli.net/2020/05/02/ZxjuY7NSw2BdhAV.png)
 
-然后在 Profile - setting - developer settings - Personal access tokens 可以生成一个车新的 token 为了 jenkins 访问账户使用（如果没有这一步，在之后第一次打开 jenkins blue ocean 的时候也会自动跳转到该处创建 token）。**创建完成之后会在页面上有一个 code，这个一定要保存下来后续会使用到。**
+然后在 Profile - setting - developer settings - Personal access tokens 可以生成一个新的 token 为了 jenkins 访问账户使用（如果没有这一步，在之后第一次打开 jenkins blue ocean 的时候也会自动跳转到该处创建 token）。**创建完成之后会在页面上有一个 code，这个一定要保存下来后续会使用到。**
 
 ![Personal access tokens](https://i.loli.net/2020/05/02/QDKO9Ha4qJFT5nS.png)
 
@@ -93,7 +93,7 @@ pipeline {
         sh 'sudo docker build -f Dockerfile -t blog  .'
         sh 'sudo docker stop blog || echo "No need stop"'
         sh 'sudo docker rm blog || echo "No need remove"'
-        sh 'sudo docker run -d -p 8004:8004 --name blog -t blog'
+        sh 'sudo docker run -d -p 8081:8081 --name blog -t blog'
       }
     }
 
