@@ -41,6 +41,7 @@ git restore --staged <file> # 取消暂存
 
 git log # 看到 git 提交的记录
 git reflog # 记录每一次的 git 命令
+git show <commitId> # 查看某次提交的具体内容
 
 git rm <file> # 从版本库中删除文件
 git rm -f <file> # 同时从工作区和暂存区删除指定的文件
