@@ -34,6 +34,8 @@ git reset --hard HEAD^ # 回退到上一个版本 HEAD 表示当前版本，HEAD
 # --soft 移动 HEAD 指针，不会修改index和working tree，本地文件的内容并没有发生变化，而index中仍然有最近一次提交的修改
 # --mixed  与--soft的不同之处在于，--mixed修改了index，使其与第二个版本匹配。index中给定commit之后的修改被unstaged。
 # --hard  那么最后一次提交的修改，包括本地文件的修改都会被清除，彻底还原到上一次提交的状态且无法找回。
+git checkout – <file> # 撤销修改的文件(如果文件加入到了暂存区，则回退到暂存区的，如果文件加入到了版本库，则还原至加入版本库之后的状态)
+git reset HEAD <file> # 撤回暂存区的文件修改到工作区
 git revert  # 回退一次提交
 
 git restore <file> # 丢弃工作区中的改动，使用暂存区的覆盖工作区
@@ -45,7 +47,9 @@ git show <commitId> # 查看某次提交的具体内容
 
 git rm <file> # 从版本库中删除文件
 git rm -f <file> # 同时从工作区和暂存区删除指定的文件
-git rm --cached <file> # 从暂存区删除指定的文件, 删除已经跟踪的文件
+git rm <-r> --cached <file> # 从暂存区删除指定的文件, 删除已经跟踪的文件
+git update-index –assume-unchanged <file> # 忽略单个文件
+git update-index –no-assume-unchanged <file> # 取消忽略单个文件 
 
 git remote add origin <远程仓库地址> # 添加远程仓库地址，origin 就是远程库
 git clone <远程仓库地址>  # 从远程地址 clone 仓库
@@ -55,6 +59,7 @@ git pull # 从远程仓库拉数据，比 git fetch 多了 merge 操作
 git push origin master # 将修改提交到远程仓库
 git checkout -b dev origin/dev # 从远程仓库 checkout branch
 
+git check-ignore -v <file> # 查看忽略规则
 ```
 
 ### Git 分支
@@ -66,8 +71,18 @@ git checkout master # 切换分支
 git switch -c dev # 创建分支
 git switch master # 切换分支
 
+git branch -v # 查看所有分支的最后一次操作
+git branch -vv # 查看当前分支
+git brabch -b # 分支名 origin/分支名 创建远程分支到本地
+git branch –merged # 查看别的分支和当前分支合并过的分支
+git branch –no-merged # 查看未与当前分支合并的分支
+
 git merge dev # 合并分支
 git branch -d dev # 删除分支
+git push origin –delete dev # 删除远处仓库分支
+git push –set-upstream origin dev # 将本地分支推送到远程仓库
+git checkout -b dev origin/dev # 下载远程仓库分支到本地
+git push origin dev # 将本地分支推送到远程仓库
 git log --graph # 分支合并图
 
 git stash # 暂存工作中的内容
@@ -86,6 +101,7 @@ git rebase # 变基
 ```bash
 git tag v1.0 <commit id> # 创建标签
 git show v1.0 # 打印 tag 信息
+git tag -a <tagname> -m <desc> # 创建新标签并增加备注
 git tag -d v1.0 # 删除一个标签
 git push origin master <tagname> # 将一个标签提交到远程仓库
 git push origin master --tags # 将所有标签提交到远程仓库
