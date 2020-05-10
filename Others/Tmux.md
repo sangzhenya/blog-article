@@ -102,7 +102,7 @@ tmux-plugins/tmux-resurrect  \
 # Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
 run '~/.tmux/plugins/tpm/tpm'
 ```
-3. 配置完成后，使用 <prefix> + I 安装插件即可
+3. 配置完成后，先使用 `tmux source ~/.tmux.conf` 重新加载配置， 然后使用 <prefix> + I 安装插件即可。
 
 使用方法: 在 tmux 使用 `<prefix> + Ctrl-s` 保存当前 session 需要恢复的时候只需要在 tmux 使用 `<prefix> + Ctrl-r` 即可恢复 session。
 
