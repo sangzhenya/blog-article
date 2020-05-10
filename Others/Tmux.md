@@ -7,7 +7,7 @@ tmux 主要由以下几个模块组成：
 1. server 服务，tmux 运行的基础服务，以下的模块均依赖此服务
 2. session 会话，一个服务可以包含多个会话
 3. window 窗口，一个会话可以包含多个窗口
-4. panel 面板，一个窗口可以包含多个面板】
+4. panel 面板，一个窗口可以包含多个面板
 
 ## 配置
 
@@ -75,5 +75,35 @@ tmux list-keys # 列出所有的 keys
 tmux list-commands # 列出所有的命令
 tmux info # 当前 session 的信息
 ```
+
+### 自定义界面
+参考：[Tmux 美化配置](https://github.com/gpakosz/.tmux)
+
+大概效果如下图：
+![Tmux](https://i.loli.net/2020/05/10/tIqrijuodyQaORl.png)
+
+注意点：
+1. 要安装正确的字体, 例如带 awesome font 的字体 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts)
+2. 使用配置要先 `tmux source .tmux.conf` 然后 `tmux source .tmux.conf.local` 启动配置
+
+### 保存 Tmux Session
+需要安装 Tmux Plugin Manager 插件。
+
+1. 首先 clone tpm 插件仓库到本地：
+`git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm`
+2. 配置 TPM Plugin
+```bash
+# List of plugins
+set -g @tpm_plugins '          \
+tmux-plugins/tpm             \
+tmux-plugins/tmux-resurrect  \
+'
+
+# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+run '~/.tmux/plugins/tpm/tpm'
+```
+3. 配置完成后，使用 <prefix> + I 安装插件即可
+
+使用方法: 在 tmux 使用 `<prefix> + Ctrl-s` 保存当前 session 需要恢复的时候只需要在 tmux 使用 `<prefix> + Ctrl-r` 即可恢复 session。
 
 参考：[Tmux 使用教程](https://www.ruanyifeng.com/blog/2019/10/tmux.html)
