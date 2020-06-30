@@ -74,5 +74,111 @@ protected Cache createConcurrentMapCache(String name) {
 	}
 ```
 
+容器启动的时候通过 aop 的方式为标注了 cache 相关注解的方法添加切点和方法，主要的类有以下几个：`ProxyCachingConfiguration` 配置 Cache AOP 的主要配置类。`BeanFactoryCacheOperationSourceAdvisor`  即 Advisor，`CacheInterceptor` 切点方法(Advice)，`CacheOperationSourcePointcut` 切点。
+
+`ProxyCachingConfiguration` 主要代码如下：
+
+```java
+@Configuration
+@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+public class ProxyCachingConfiguration extends AbstractCachingConfiguration {
+
+  // 为容器中添加 Advisor, 其内部包含 PointCut
+	@Bean(name = CacheManagementConfigUtils.CACHE_ADVISOR_BEAN_NAME)
+	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+	public BeanFactoryCacheOperationSourceAdvisor cacheAdvisor() {
+		//....
+	}
+
+  // 为容器引入 CacheInterceptor
+	@Bean
+	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+	public CacheInterceptor cacheInterceptor() {
+		//...
+	}
+
+}
+
+```
+
+
+
+Advisor, Advice 和 PointCut 的关系可以使用下图表示，即 Advisor 包含 Advice 和 PointCut，PointCut 表明在什么地方执行方法，Advice 表示则表示在方法之前之后还是包含的方法的方式执行具体什么方法。
+
+![Adivsor, Advice, PointCut](https://i.loli.net/2020/06/30/z3C5ErPK7ti4XU9.png)
+
+ `CacheOperationSourcePointcut` 比较简单，其继承了 `StaticMethodMatcherPointcut`，拿到所有标注了cache 相关注解的方法。
+
+`CacheInterceptor` 也比较简单，简单的看为一个 around advice，主要方法在其父类 `CacheAspectSupport` 实现，即 `execute` 该方法会在标注了 cache 相关注解的方法调用的时候执行。
+
 #### 运行的步骤
+
+如果一个方法标注了 `@Cacheable `  注解，那么每次在执行方法之前都会去检查缓存中是否已经存在了，如果对应的 cache 不存在则会根据配置的 cache name 创建一个 cache，然后根据生成的 key 从 cache 中找对应的 item，如果存在则直接返回 cache 中的值，否则会继续执行方法然后将方法返回的结果放到 cache 中。简单的调用图如下：
+
+![简单的调用流程](https://i.loli.net/2020/06/30/UdPbFvSHWg4kxKB.png)
+
+上图调用流程完毕之后会执行下面的代码：
+
+```java
+// Collect puts from any @Cacheable miss, if no cached item is found
+List<CachePutRequest> cachePutRequests = new LinkedList<>();
+if (cacheHit == null) {
+  collectPutRequests(contexts.get(CacheableOperation.class),
+                     CacheOperationExpressionEvaluator.NO_RESULT, cachePutRequests);
+}
+
+Object cacheValue;
+Object returnValue;
+if (cacheHit != null && !hasCachePut(contexts)) {
+  // If there are no put requests, just use the cache hit
+  cacheValue = cacheHit.get();
+  returnValue = wrapCacheValue(method, cacheValue);
+}
+else {
+  // Invoke the method if we don't have a cache hit
+  returnValue = invokeOperation(invoker);
+  cacheValue = unwrapReturnValue(returnValue);
+}
+// Collect any explicit @CachePuts
+collectPutRequests(contexts.get(CachePutOperation.class), cacheValue, cachePutRequests);
+
+// Process any collected put requests, either from @CachePut or a @Cacheable miss
+for (CachePutRequest cachePutRequest : cachePutRequests) {
+  cachePutRequest.apply(cacheValue);
+}
+
+// Process any late evictions
+processCacheEvicts(contexts.get(CacheEvictOperation.class), false, cacheValue);
+```
+
+补充一点就是生成 key 的逻辑：
+
+```java
+// 如果定义了 SPEL 则根据 SPEL 生成，否则则直接使用 SimpleKeyGenerator
+protected Object generateKey(@Nullable Object result) {
+  if (StringUtils.hasText(this.metadata.operation.getKey())) {
+    EvaluationContext evaluationContext = createEvaluationContext(result);
+    return evaluator.key(this.metadata.operation.getKey(), this.metadata.methodKey, evaluationContext);
+  }
+  return this.metadata.keyGenerator.generate(this.target, this.metadata.method, this.args);
+}
+
+// 默认规则，如果没有参数则使用空 SimpleKey， 如果只有一个参数则直接使用该参数，如果有多个参数则包装成 SimpleKey
+public static Object generateKey(Object... params) {
+  if (params.length == 0) {
+    return SimpleKey.EMPTY;
+  }
+  if (params.length == 1) {
+    Object param = params[0];
+    if (param != null && !param.getClass().isArray()) {
+      return param;
+    }
+  }
+  return new SimpleKey(params);
+}
+```
+
+到这里缓存运行的部分就结束了。
+
+### Cache 注解
 
