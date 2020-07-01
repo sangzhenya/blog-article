@@ -38,9 +38,20 @@
    6. `condition` 在特定情况下缓存
    7. `unless` 否定缓存，指定的条件不缓存
    8. `sync` 是否采用异步的方式 
-2. `@CacheEvict` 清空缓存
+2. `@CacheEvict` 清空缓存, 其既可以从某一个或多个 cache 删除指定的 key，也可以通过 `allEntries` 指定删除 cache 中所有的条目。此外默认清除缓存是在方法之后执行的，不过其还可以通过 `beforeInvocation` 属性指定是否在方法执行之前执行删除操作。
 3. `@CachePut` 保证方法被调用，又希望结果被缓存
 4. `@CacheConfig` 类级别的 common 的注解配置
+
+如果使用了 Spring Boot 则直接在 pom 文件中引入 cache 相关的依赖。
+
+```xml
+<dependency>
+   <groupId>org.springframework.boot</groupId>
+   <artifactId>spring-boot-starter-cache</artifactId>
+</dependency>
+```
+
+
 
 ### 缓存的原理
 
@@ -96,7 +107,6 @@ public class ProxyCachingConfiguration extends AbstractCachingConfiguration {
 	public CacheInterceptor cacheInterceptor() {
 		//...
 	}
-
 }
 
 ```
@@ -180,5 +190,270 @@ public static Object generateKey(Object... params) {
 
 到这里缓存运行的部分就结束了。
 
-### Cache 注解
+### Cache 注解相关属性
+
+首先看一下 `keyGenerator` 配置，如果默认的 `SimpleKeyGenerator` 无法满足需求的话也可以自定义一个 `KeyGenerator`，然后通过 `keyGenerator` 配置自定义的 Key Generator 例如：
+
+```java
+@Bean("customizedKeyGenerator")
+public KeyGenerator keyGenerator() {
+  return new KeyGenerator() {
+    @Override
+    public Object generate(Object target, Method method, Object... params) {
+      return method.getName() + "::" + Arrays.asList(params).toString();
+    }
+  };
+}
+```
+
+```java
+@Cacheable(cacheNames="books", keyGenerator="customizedKeyGenerator")
+public Book findBook(ISBN isbn, boolean checkWarehouse, boolean includeUsed)
+```
+
+然后看一下 `condition` 的配置，例如只有在名称小于 32 的时候才进行缓存。
+
+```java
+@Cacheable(cacheNames="book", condition="#name.length() < 32") 
+public Book findBook(String name)
+```
+
+此外为了对 condition 进行补充，Spring 还提供了 `unless` 配置，即在上述的条件满足的情况下如果也满足 `unless` 中的条件则还是进行缓存的，例如：
+
+```java
+@Cacheable(cacheNames="book", condition="#name.length() < 32", unless="#result.hardback") 
+public Book findBook(String name)
+```
+
+当然也是支持 Optional 的，例如：
+
+```java
+@Cacheable(cacheNames="book", condition="#name.length() < 32", unless="#result?.hardback")
+public Optional<Book> findBook(String name)
+```
+
+默认情况下是以异步的方式操作缓存的，针对于多线程的情况，也可以指定缓存以同步的方式进行，只需要设置 `sync` 属性即可，如果设置了该属性那么则无法使用 `unless` 属性，也不能指定多个缓存。
+
+```java
+@Cacheable(cacheNames="foos", sync=true) 
+public Foo executeExpensiveOperation(String id) {...}
+```
+
+针对于需要复杂的 cache 配置的情况可以使用 `@Caching` 注解，例如下面的例子
+
+```java
+@Caching(
+  cacheable = {@Cacheable(value = "bk1", key = "#id")},
+  put = {
+    @CachePut(value = "bk2", key = "#result.name"),
+    @CachePut(value = "bk2", key = "#result.title")
+  },
+  evict = {
+    @CacheEvict(value = "list", allEntries = true)
+  }
+)
+public Book updateBooking(String id) {...}
+```
+
+另外如果某些定制选项应用于类的所有操作，那么配置起来可能会很麻烦。例如，为类的每个缓存操作指定要使用的缓存名称可以由单个类级别定义替换，这里可以使用 `@CacheConfig` 配置，例如一个简单的配置如下：
+
+```java
+@CacheConfig("books") 
+public class BookRepositoryImpl implements BookRepository {
+    @Cacheable
+    public Book findBook(ISBN isbn) {...}
+}
+```
+
+### 使用 Redis 作为缓存
+
+如果使用 Spring Boot 则可以通过 pom 文件引入 redis 相关的依赖，例如：
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+简单的配置如下：
+
+```yaml
+spring:
+  redis:
+    port: 6002
+    host: *.*.*.*
+    #password: ***
+    #database: *
+```
+
+如果引用了 Redis 相关的依赖哪儿 `RedisCacheConfiguration` 则会生效，为容器引入 `RedisCacheManager` 用于管理 Redis 的 Cache 相同的内容。当然和其他类似的依赖类似，也可以通过  去自定义 Redis 相关的内容，简单的例子如下：
+
+```java
+@Bean
+public RedisCacheManagerBuilderCustomizer myRedisCacheManagerBuilderCustomizer() {
+  return (builder) -> builder
+    .withCacheConfiguration("cache1",
+                            RedisCacheConfiguration.defaultCacheConfig().entryTtl(Duration.ofSeconds(10)))
+    .withCacheConfiguration("cache2",
+                            RedisCacheConfiguration.defaultCacheConfig().entryTtl(Duration.ofMinutes(1)));
+
+}
+```
+
+配置了以上的内容之后在此使用到缓存的时候就会自动使用 redis 作为缓存了。
+
+在新版本的 Spring boot 中默认使用 `Lettuce` 作为默认的  Redis Client
+
+```log
+LettuceConnectionConfiguration#redisConnectionFactory matched:
+      - @ConditionalOnMissingBean (types: org.springframework.data.redis.connection.RedisConnectionFactory; SearchStrategy: all) did not find any beans (OnBeanCondition)
+```
+
+#### Redis 自动配置过程
+
+首先看一下 `RedisAutoConfiguration` 这个配置类，在引入了 Redis 相关的依赖的时候才会起作用，其为容器中引入了两份 Config 和两个 Bean，Config 分别是 `LettuceConnectionConfiguration` 和 `JedisConnectionConfiguration` 即两个 Redis Client 的客户端配置，两个 Bean 是操作 Redis 的 Template 是对 Redis 操作的封装（PS: 感觉 Spring 提供了各种各样的 Template）。
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(RedisOperations.class)
+@EnableConfigurationProperties(RedisProperties.class)
+@Import({ LettuceConnectionConfiguration.class, JedisConnectionConfiguration.class })
+public class RedisAutoConfiguration {
+
+	@Bean
+	@ConditionalOnMissingBean(name = "redisTemplate")
+	public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory)
+			throws UnknownHostException {
+		RedisTemplate<Object, Object> template = new RedisTemplate<>();
+		template.setConnectionFactory(redisConnectionFactory);
+		return template;
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory)
+			throws UnknownHostException {
+		StringRedisTemplate template = new StringRedisTemplate();
+		template.setConnectionFactory(redisConnectionFactory);
+		return template;
+	}
+
+}
+
+```
+
+然后看一下 `LettuceConnectionConfiguration` Spring Boot 默认是使用这一份配置，其主要为容器引入了 `LettuceConnectionFactory` 实现 `RedisConnectionFactory `接口。
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(RedisClient.class)
+class LettuceConnectionConfiguration extends RedisConnectionConfiguration {
+
+	LettuceConnectionConfiguration(RedisProperties properties,
+			ObjectProvider<RedisSentinelConfiguration> sentinelConfigurationProvider,
+			ObjectProvider<RedisClusterConfiguration> clusterConfigurationProvider) {
+		super(properties, sentinelConfigurationProvider, clusterConfigurationProvider);
+	}
+
+	@Bean(destroyMethod = "shutdown")
+	@ConditionalOnMissingBean(ClientResources.class)
+	DefaultClientResources lettuceClientResources() {
+		return DefaultClientResources.create();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(RedisConnectionFactory.class)
+	LettuceConnectionFactory redisConnectionFactory(
+			ObjectProvider<LettuceClientConfigurationBuilderCustomizer> builderCustomizers,
+			ClientResources clientResources) throws UnknownHostException {
+		LettuceClientConfiguration clientConfig = getLettuceClientConfiguration(builderCustomizers, clientResources,
+				getProperties().getLettuce().getPool());
+		return createLettuceConnectionFactory(clientConfig);
+	}
+	// 	...
+}
+```
+
+然后看一下 Redis Cache 相关的配置, 主要是 `RedisCacheConfiguration` 配置类，其在 `RedisConnectionFactory` 存在的情况下才会起作用，所以需要引入 Redis 相关的依赖的，`RedisAutoConfiguration` 起作用后才会生效。其主要为容器引入了 `RedisCacheManager` 用于管理 Cache。
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(RedisConnectionFactory.class)
+@AutoConfigureAfter(RedisAutoConfiguration.class)
+@ConditionalOnBean(RedisConnectionFactory.class)
+@ConditionalOnMissingBean(CacheManager.class)
+@Conditional(CacheCondition.class)
+class RedisCacheConfiguration {
+
+	@Bean
+	RedisCacheManager cacheManager(CacheProperties cacheProperties, CacheManagerCustomizers cacheManagerCustomizers,
+			ObjectProvider<org.springframework.data.redis.cache.RedisCacheConfiguration> redisCacheConfiguration,
+			ObjectProvider<RedisCacheManagerBuilderCustomizer> redisCacheManagerBuilderCustomizers,
+			RedisConnectionFactory redisConnectionFactory, ResourceLoader resourceLoader) {
+		RedisCacheManagerBuilder builder = RedisCacheManager.builder(redisConnectionFactory).cacheDefaults(
+				determineConfiguration(cacheProperties, redisCacheConfiguration, resourceLoader.getClassLoader()));
+		List<String> cacheNames = cacheProperties.getCacheNames();
+		if (!cacheNames.isEmpty()) {
+			builder.initialCacheNames(new LinkedHashSet<>(cacheNames));
+		}
+		redisCacheManagerBuilderCustomizers.orderedStream().forEach((customizer) -> customizer.customize(builder));
+		return cacheManagerCustomizers.customize(builder.build());
+	}
+	//...
+}
+
+```
+
+有了 `RedisCacheManger`, 即可以通过其获取 `RedisCache` ，`RedisCache` 会根据缓存的操作处理 Redis 中的数据。对于 Redis 来说获取 Cache 和 从 Cache 中获取具体的 Item 流程如下，对于 `getCache` 来说会使用 `AbstractCacheManager` 中的 `getCache` 方法。
+
+```java
+public Cache getCache(String name) {
+  // Quick check for existing cache...
+  Cache cache = this.cacheMap.get(name);
+  if (cache != null) {
+    return cache;
+  }
+
+  // The provider may support on-demand cache creation...
+  Cache missingCache = getMissingCache(name);
+  if (missingCache != null) {
+    // Fully synchronize now for missing cache registration
+    synchronized (this.cacheMap) {
+      cache = this.cacheMap.get(name);
+      if (cache == null) {
+        cache = decorateCache(missingCache);
+        this.cacheMap.put(name, cache);
+        updateCacheNames(name);
+      }
+    }
+  }
+  return cache;
+}
+```
+
+如果没有 cache 则会通过 `getMissingCache` 生成一个 Cache, `RedisCacheManger` 中的实现如下：
+
+```java
+protected RedisCache getMissingCache(String name) {
+  return allowInFlightCacheCreation ? createRedisCache(name, defaultCacheConfig) : null;
+}
+protected RedisCache createRedisCache(String name, @Nullable RedisCacheConfiguration cacheConfig) {
+  return new RedisCache(name, cacheWriter, cacheConfig != null ? cacheConfig : defaultCacheConfig);
+}
+```
+
+在引入 `RedisCacheManger` 的时候就已经引入一份 默认的 cache 配置。而从 Cache 中查找缓存条目则在 `RedisCache` 中通过 `RedisCacheWriter` 去操作 Redis 数据库。
+
+```java
+protected Object lookup(Object key) {
+  byte[] value = cacheWriter.get(name, createAndConvertCacheKey(key));
+  if (value == null) {
+    return null;
+  }
+  return deserializeCacheValue(value);
+}
+```
+
+#### Redis 序列化机制
 
