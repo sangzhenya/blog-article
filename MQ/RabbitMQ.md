@@ -42,10 +42,158 @@ Rabbit MQ 是一个由 erlang 开发的 AMQP 的开源实现，主要有以下�
 6. Connection，网络连接，例如一个 TCP 连接。
 7. Channel，信道，多路复用连接中的一条独立的双向数据流通道。信道是建立在真实的 TCP 连接内的虚拟连接，AMQP 命令都是通过信道发送出去的，不管是发布消息，订阅队列还是接收消息，这些动作都是通过信道完成。因为对于操作系统来说建立和销毁 TCP 都是非常昂贵的开销，所以引入了信道的概念，以复用一条 TCP 连接。
 8. Consumer 消息消费者，表示一个从消息队列中取得消息的客户端应用程序。
-9. Virtual Host 虚拟主机，表示一批交换器、消息队列和相关对象。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个mini 的 RabbitMQ 的服务器，用于自己的队列，交换器，绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接的时候指定。RabbitMQ 默认 vhost 是 /.
-10. Broker 表示消息队列服务器实体。
+9. Virtual Host 虚拟主机，表示一批交换器、消息队列和相关对象。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个mini 的 RabbitMQ 的服务器，用于自己的队列，交换器，绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接的时候指定。RabbitMQ 默认 vhost 是 /。
+10. . Broker 表示消息队列服务器实体。
 
 结构图如下：
 
 ![结构图](https://i.loli.net/2020/07/02/7Rpt26EzYDixM3j.png)
+
+RabbitMQ 启动后默认使用两个端口，一个 15672 作为 Web 管理端口，一个是 5672 作为通讯端口。
+
+### Rabbit MQ 运行机制
+
+首先看一下 AMQP 中的消息路由，其和 Java 开发者熟悉的 JMS 存在一些差别，AMQP 中增加了 Exchange 和 Binding 的校色。生产中把消息发布到 Exchange上，消息最终到达队列并被消费者接收，而 Binding 决定交换器的消息应该发送到哪个队列。结构如下：
+
+![结构如下](https://i.loli.net/2020/07/04/mGzcrdZAPMaCFgU.png)
+
+#### Exchange 的类型
+
+主要有四种：Direct、Fanout、Topic 和 Headers。
+
+Direct Exchange：消息中的路由键（Routing Key） 如果和 Binding 队列中的 Binding Key 一致的话，交换器就将消息发到对应的队列中。路由键与队列名完全匹配，如果一个队列绑定到交换器要求路由键为 Dog 那么仅转发 Routing Key 为 Dog 的消息，不会转发其他路由键的消息，例如 dog.puppy，是一个简单的完全匹配的模式。
+
+![Direct Exchange](https://i.loli.net/2020/07/04/cJ1LOaRrt5GBgjC.png)
+
+Fanout Exchange：每个发到 Fanout Exchange 的消息都会分到所有绑定的队列上。Fanout 交换器不处理 Routing Key 而是简单的将队列绑定到 Exchange 上，每个发送到交换器的消息都会被转发到与该交换器绑定的所有队列上。和子网广播类似，每台子网内的主机都会受到一份复制消息，Fanout 类库转发消息最快。
+
+![Fanout](https://i.loli.net/2020/07/04/9SQLP8DqTWfAnbj.png)
+
+Topic Exchange：其通过模式匹配分配消息，可以将 Routing Key 和某个模式进行匹配，此时对象需要绑定到一个模式上。它将 Routing Key 和 Binding Key 的单子切分成单词，这些单子之间使用 `.` 分割。同样识别两个通配符，`#` 表示 0 个或多个单词，`*` 表示匹配一个单词。
+
+![Topic Exchange](https://i.loli.net/2020/07/04/dDxSAmW9IFM6nf8.png)
+
+Headers Exchange：其匹配的是 AMQP 消息的 Header，而不是使用路由键，Headers Exchange 和 Direct Exchange 几乎一致，但是性能却差很多，所以一般情况使用不到。
+
+### Spring Boot 中使用 RabbitMQ
+
+首先如果要使用 RabbitMQ 则需要在 POM 文件引入相关的依赖如下：
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+
+需要使用 `@EnableRabbit` 注解启用，然后看一下自动配置的原理。从 `RabbitAutoConfiguration` 开始，其为容器中引入了 `rabbitConnectionFactory`  连接工厂，连接到 RabbitMQ Server, `RabbitTemplate` 用于发送接收 MQ 数据（类似 JDBC Template 等 Template）, `AmqpAdmin`  管理 AMPQ 创建删除 Exchange，Queue，Binding 等等。另外还为容器中引入了`RabbitAnnotationDrivenConfiguration` Config 类，这个配置类引入了一些配置信息。
+
+`RabbitTemplate` 默认使用的是 `MessageConverter` 是 `SimpleMessageConverter`。
+
+```java
+private MessageConverter messageConverter = new SimpleMessageConverter();
+```
+
+在其 `createMessage` 方法中默认使用的是 `SerializationUtils.serialize(object);` 去序列化一个对象，转换成 byte 数组。
+
+```log
+content_type:	application/x-java-serialized-object
+```
+
+当然也可以不使用默认的 Message Convert 方法，其内部也提供了一些 Converter 方法类：
+
+![](https://i.loli.net/2020/07/04/D35UVBGScXLdHoK.png)
+
+另外在 AutoConfig 引入 `RabbitTemplate` 的时候会从容器中获取 Convert 类，作为默认的 Convert 类。
+
+```java
+@Bean
+@ConditionalOnSingleCandidate(ConnectionFactory.class)
+@ConditionalOnMissingBean(RabbitOperations.class)
+public RabbitTemplate rabbitTemplate(RabbitProperties properties,
+                                     ObjectProvider<MessageConverter> messageConverter,
+                                     ObjectProvider<RabbitRetryTemplateCustomizer> retryTemplateCustomizers,
+                                     ConnectionFactory connectionFactory) {
+  PropertyMapper map = PropertyMapper.get();
+  RabbitTemplate template = new RabbitTemplate(connectionFactory);
+  messageConverter.ifUnique(template::setMessageConverter);
+  //...
+  return template;
+}
+```
+
+所以可以通过为容器中导入一个 `MessageConverter` 的方式更改默认的 Convert 规则，例如：
+
+```java
+ @Bean
+public MessageConverter messageConverter() {
+  return new Jackson2JsonMessageConverter();
+}
+```
+
+再次发送就会使用 JSON 的方式了：
+
+```log
+content_type:	application/json
+```
+
+####  Rabbit MQ 操作
+
+发送消息：
+
+```java
+public void sendDemoUser() {
+  DemoUser demoUser = new DemoUser();
+  demoUser.setId(1);
+  demoUser.setName("Hello World");
+  demoUser.setPassword("DummyPassword");
+  rabbitTemplate.convertAndSend("demo.direct", "usa.news", demoUser);
+}
+```
+
+接收消息：
+
+```java
+public void receive(){
+  Object o = rabbitTemplate.receiveAndConvert("usa.news");
+  LogFactory.getLog(RabbitdemoApplicationTests.class.getSimpleName()).info(o);
+}
+```
+
+使用 Listener 的方式接收消息：
+
+```java
+@RabbitListener(queues = "usa.news")
+public void receive(DemoUser user) {
+  log.info(user);
+}
+
+@RabbitListener(queues = "europe.news")
+public void receiveMessage(Message message) {
+  try {
+    log.info(new ObjectMapper().readValue(message.getBody(), DemoUser.class));
+  } catch (IOException e) {
+    e.printStackTrace();
+  }
+  log.info(message.getBody());
+  log.info(message.getMessageProperties());
+}
+```
+
+管理 AMQP：
+
+```java
+public void admin() {
+  Exchange exchange = new TopicExchange("java.topic", true, false);
+  amqpAdmin.declareExchange(exchange);
+
+  Queue queue = new Queue("xinyue", true, false, false);
+  amqpAdmin.declareQueue(queue);
+
+  Binding binding = new Binding("xinyue", Binding.DestinationType.QUEUE, "java.topic", "xinyue.#", new HashMap<>());
+  amqpAdmin.declareBinding(binding);
+}
+```
+
+
 
