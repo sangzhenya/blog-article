@@ -1,4 +1,9 @@
-## MyBatis 运行原理
+---
+title: "MyBatis 运行原理"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-11T09:00:00+08:00"
+---
 
 MyBaits 分层结构图
 

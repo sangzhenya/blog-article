@@ -1,6 +1,9 @@
-## RabbitMQ
-
-[toc]
+---
+title: "Rabbit MQ"
+tags: ["Rabbit MQ"]
+categories: ["MQ"]
+date: "2019-06-03T09:00:00+08:00"
+---
 
 ### 概述
 

@@ -1,4 +1,9 @@
-## MyBaits 配置文件
+---
+title: "MyBatis 配置文件"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-09T09:00:00+08:00"
+---
 
 MyBaits 是一个半自动化的持久化层框架，支持定制化 SQL，存储过程以及高级映射。避免 JDBC 代码和手动设置参数以及获取结果集。其使用简单的 XML 或注解用于配置和原始映射，将接口和 Java 的对象映射成数据库记录。
 

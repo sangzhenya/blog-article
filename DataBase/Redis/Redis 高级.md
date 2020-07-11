@@ -1,4 +1,9 @@
-## Redis 高级
+---
+title: "Redis 高级"
+tags: ["Redis"]
+categories: ["Redis"]
+date: "2019-05-27T09:00:00+08:00"
+---
 
 ### Redis 持久化
 

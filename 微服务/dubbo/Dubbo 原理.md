@@ -1,4 +1,9 @@
-## Dubbo 原理
+---
+title: "Dubbo 原理"
+tags: ["Dubbo"]
+categories: ["微服务"]
+date: "2020-02-07T09:00:00+08:00"
+---
 
 参考：[Dubbo 开发者指南](http://dubbo.apache.org/zh-cn/docs/dev/design.html)
 

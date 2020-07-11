@@ -1,6 +1,9 @@
-## ACID 原则 与 CAP 原则
-
-[TOC]
+---
+title: "ACID 原则 与 CAP 原则"
+tags: ["微服务"]
+categories: ["微服务"]
+date: "2020-01-03T09:00:00+08:00"
+---
 
 ### **ACID 原则**
 

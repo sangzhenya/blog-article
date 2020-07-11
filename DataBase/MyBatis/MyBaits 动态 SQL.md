@@ -1,4 +1,9 @@
-## MyBatis 动态 SQL
+---
+title: "MyBatis 动态 SQL"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-05T09:00:00+08:00"
+---
 
 使用 MyBatis 可以很轻松的完成动态 SQL 的拼写。
 

@@ -1,4 +1,9 @@
-## Dubbo 基本配置
+---
+title: "Dubbo 基本配置"
+tags: ["Dubbo"]
+categories: ["微服务"]
+date: "2020-02-03T09:00:00+08:00"
+---
 
 参考地址：[Dubbo 配置](https://dubbo.apache.org/zh-cn/docs/user/demos/preflight-check.html)
 

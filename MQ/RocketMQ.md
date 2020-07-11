@@ -1,4 +1,9 @@
-## RocketMQ
+---
+title: "Rocket MQ"
+tags: ["Rocket MQ"]
+categories: ["MQ"]
+date: "2019-06-05T09:00:00+08:00"
+---
 
 [RocketMQ 原始文档地址 ](https://github.com/apache/rocketmq/tree/master/docs/cn)
 

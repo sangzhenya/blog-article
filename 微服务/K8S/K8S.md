@@ -1,4 +1,9 @@
-## Kubernetes
+---
+title: "Kubernetes"
+tags: ["Kubernetes"]
+categories: ["微服务"]
+date: "2020-01-25T09:00:00+08:00"
+---
 
 K8S 是一个工业级的容器编排平台。主要有以下一些特点：轻量级，消耗资源少；弹性伸缩；负载均衡。
 

@@ -1,4 +1,9 @@
-## 四种引用类型
+---
+title: "Java 四种引用类型"
+tags: ["Java", "JVM"]
+categories: ["Java"]
+date: "2020-02-11T09:00:00+08:00"
+---
 
 ![四种引用类型](https://i.loli.net/2019/06/16/5d063bd4cf73280638.png)
 

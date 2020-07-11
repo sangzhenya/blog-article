@@ -1,4 +1,9 @@
-## MyBatis SQL 映射
+---
+title: "MyBatis SQL 映射"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-15T09:00:00+08:00"
+---
 
 一个包含增删改查的 MyBatis Mapper 文件如下：
 

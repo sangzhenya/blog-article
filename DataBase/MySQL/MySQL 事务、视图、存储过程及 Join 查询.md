@@ -1,4 +1,9 @@
-## MySQL 事务、视图、存储过程及 Join 查询
+---
+title: "MySQL 事务、视图、存储过程及 Join 查询"
+tags: ["MySQL"]
+categories: ["MySQL"]
+date: "2019-05-19T09:00:00+08:00"
+---
 
 ### 事务
 

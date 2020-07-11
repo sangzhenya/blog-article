@@ -1,4 +1,9 @@
-## MyBaits 插件
+---
+title: "MyBaits 插件"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-03T09:00:00+08:00"
+---
 
 MyBatis 在创建四个主要对象（`Executor`， `ParameterHandler`, `ResultSetHandler`, `StatementHandler`）的过程中都会使用到插件。插件可以利用动态代理机制一层层的包装目标对象从而实现在目标对象执行目标方法之前进行拦截。
 

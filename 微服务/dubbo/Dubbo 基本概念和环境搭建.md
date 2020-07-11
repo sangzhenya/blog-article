@@ -1,4 +1,9 @@
-## Dubbo 基本概念和环境搭建
+---
+title: "Dubbo 基本概念和环境搭建"
+tags: ["Dubbo"]
+categories: ["微服务"]
+date: "2020-02-01T09:00:00+08:00"
+---
 
 参考： [Dubbo  快速入门]( https://dubbo.apache.org/zh-cn/docs/user/quick-start.html)
 

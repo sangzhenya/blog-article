@@ -1,4 +1,9 @@
-## Java JVM
+---
+title: "Java JVM"
+tags: ["Java", "JVM"]
+categories: ["Java"]
+date: "2020-03-03T09:00:00+08:00"
+---
 
 ### MinorGC 的过程 
 

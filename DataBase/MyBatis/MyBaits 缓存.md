@@ -1,4 +1,9 @@
-## MyBaits 缓存
+---
+title: "MyBatis 缓存"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-07T09:00:00+08:00"
+---
 
 MyBatis 具有非常强大的缓存特性，可以方便的配置和定制。其默认定义了两级缓存：分布是一集缓存和二级缓存。
 

@@ -1,4 +1,9 @@
-## MyBaits 自定义 TypeHandler
+---
+title: "MyBatis 自定义 TypeHandler"
+tags: ["MyBaits"]
+categories: ["MyBaits"]
+date: "2019-05-13T09:00:00+08:00"
+---
 
 MyBaits 支持通过自定义的 TypeHandler 的形式来设置参数或从结果中取出数据集的时候的封装策略。主要有以下几步：
 

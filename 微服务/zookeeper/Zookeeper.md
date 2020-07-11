@@ -1,4 +1,9 @@
-## Zookeeper
+---
+title: "Zookeeper"
+tags: ["Zookeeper"]
+categories: ["微服务"]
+date: "2020-01-07T09:00:00+08:00"
+---
 
 Zookeeper 从设计模式角度来看是一个机遇观察者模式的设计的分布式服务管理框架，负责存储和管理需要关心的数据，接受观察者注册，一旦观察的数据状态发生变化，Zookeeper 将负责将通知已经在 Zookeeper 上注册的那些观察者做出相应的反应。Zookeeper 结构图如下：
 

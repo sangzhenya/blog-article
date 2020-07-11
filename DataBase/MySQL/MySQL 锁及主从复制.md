@@ -1,4 +1,9 @@
-### MySQL 锁及主从复制
+---
+title: "MySQL 锁及主从复制"
+tags: ["MySQL"]
+categories: ["MySQL"]
+date: "2019-05-23T09:00:00+08:00"
+---
 
 ### 锁
 

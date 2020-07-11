@@ -1,4 +1,9 @@
-## Redis
+---
+title: "Redis"
+tags: ["Redis"]
+categories: ["Redis"]
+date: "2019-05-25T09:00:00+08:00"
+---
 
 ### NoSQL
 

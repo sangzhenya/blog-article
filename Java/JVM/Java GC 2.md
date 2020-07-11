@@ -1,10 +1,13 @@
-## Java GC 收集器
+---
+title: "Java GC 2"
+tags: ["Java", "JVM"]
+categories: ["Java"]
+date: "2020-02-25T09:00:00+08:00"
+---
 
 几种垃圾回收器：
 
 ![几种垃圾回收器对比](https://i.loli.net/2019/06/19/5d0a2546f00be94890.png)
-
-
 
 ### Serial
 
