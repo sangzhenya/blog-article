@@ -1,6 +1,9 @@
-## Java ReentrantLock
-
-[TOC]
+---
+title: "Java ReentrantLock"
+tags: ["java", "JUC"]
+categories: ["Java"]
+date: "2019-01-01T23:00:00+08:00"
+---
 
 ReentrantLock 重入锁，即支持重复进入的锁，该锁能够支持一个线程对一个资源反复的加锁。实现可重入锁需要解决两个问题：
 

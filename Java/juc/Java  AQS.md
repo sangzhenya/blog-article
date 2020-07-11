@@ -1,8 +1,17 @@
-## Java AQS
+---
+title: "Java AQS"
+tags: ["java", "JUC"]
+categories: ["Java"]
+date: "2019-01-01T21:00:00+08:00"
+# toc: true
+---
 
-[TOC]
+众所周知 synchronized 是重量级锁，虽然在 JDK 1.6 后使用了轻量级锁，偏向锁，自适应自旋锁，锁粗化，锁消除等手段去去优化，但是其基于 JVM 的隐式获取和释放锁的方式导致缺少了获取锁和释放锁的可操作性。如果需要高效的实现锁并操作获取和释放锁的过程则需要使用显式锁 Lock，而其中 JUC 包下的 AQS 类是很多锁组件的基础。
 
-AQS 即 AbstractQueuedSynchronizer 即队列同步器，时用来构建锁和其他同步组建的基础框架，使用 int 类型的 state 属性表示同步的状态，通过内置的基于  CLH  锁的 FIFO 队列来完成线程的管理。AQS 定义了使用者与锁交互的接口，将基础同步相关得抽象细节封装，大大降低了实现同步工具的工作。
+AQS 即 `AbstractQueuedSynchronizer`, 是一个构建锁和同步队列的框架，底层是使用 CAS 保证操作的原子性，利用 FIFO 队列实现线程之间的锁竞争。 AQS 是 `ReentrantLock` ， `CountDownLatch`  和 `Semaphore` 等锁的底层实现机制，其将基础同步相关的抽象细节封装。使用 int 类型的 state 属性表示同步的状态，通过内置的基于  CLH  锁的 FIFO 队列来完成线程的管理。AQS 定义了使用者与锁交互的接口，将基础同步相关得抽象细节封装，大大降低了实现同步工具的工作。
+
+AQS 依赖一个 FIFO 双向队列依赖来完成同步状态的管理，如果当前线程获取同步状态失败时，AQS 则会将当前线程已经等待的状态信息构造成一个节点并加入到同步队列中，同时会阻塞当前线程时。当同步状态释放的时候，会把首节点唤醒，使其再次尝试获取同步状态。队列中的每个线程都保存着线程的引用，状态信息，前驱节点，后继节点。
+
 
 ### LockSupport
 
@@ -166,6 +175,48 @@ protected int tryAcquireShared(int arg) {}
 protected boolean tryReleaseShared(int arg) {}
 // 当前 AQS 是否在独占模式下被线程占用，一般该方法表示是否被当前线程所独占
 protected boolean isHeldExclusively() {}
+```
+
+
+主要的成员方法有以下：
+
+```java
+// 获取和设置当前的同步状态
+protected final int getState(){}
+protected final void setState(int newState){}
+// 使用 CAS 设置当前状态，保证原子性
+protected final boolean compareAndSetState(int expect, int update){}
+// 独占式获取同步状态，获取成功，则其他线程需要等待该县城释放同步状态
+protected boolean tryAcquire(int arg) {}
+// 独占式释放同步状态
+protected boolean tryRelease(int arg) {}
+// 共享式获取同步状态，返回值大于 0 则表示获取成功，否二获取失败。
+protected int tryAcquireShared(int arg) {}
+// 共享式释放同步状态
+protected boolean tryReleaseShared(int arg) {}
+// 当前同步器是否在独占模式下单线程占用，一般表示是否当前线程所独占
+protected boolean isHeldExclusively() {}
+// 独占式获取同步状态，如果当前线程获取同步状态成功，则由该方法返回，否则将会进入同步队列等待，该方法将会调用可重写的 tryAcquire 方法
+public final void acquire(int arg) {}
+// 与 acquire 相同，但是该方法相应中断，当前线程获得同步状态进入到同步列表中，如果当前线程被中断，则该方法抛出 InterruptedException 异常返回
+public final void acquireInterruptibly(int arg)
+            throws InterruptedException {}
+// 超时获取同步状态，如果当前线程在 nano 时间内没有获取到同步状态，那么将会返回 flase, 如果获取返回 true
+public final boolean tryAcquireNanos(int arg, long nanosTimeout)
+            throws InterruptedException {}
+// 共享式获取同步状态，响应中断
+public final void acquireShared(int arg) {}
+// 共享式获取同步状态，响应中断
+public final void acquireSharedInterruptibly(int arg)
+            throws InterruptedException {}
+// 共享式获取同步状态，增加超时限制
+public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout)
+            throws InterruptedException {}
+// 独占式释放同步状态，该方法在释放同步状态后，将同步队列的第一个节点包含的线程唤醒
+public final boolean release(int arg) {}
+// 共享式释放同步状态
+public final boolean releaseShared(int arg) {}
+
 ```
 
 AQS 提供的模板方法如下：
@@ -680,4 +731,6 @@ public final boolean releaseShared(int arg) {
 1. [Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)
 2. [不可不说的Java“锁”事](https://tech.meituan.com/2018/11/15/java-lock.html)
 3. [Java并发编程的艺术](https://book.douban.com/subject/26591326/)
-
+4. [Java并发编程实战](https://book.douban.com/subject/10484692/)
+5. [【死磕Java并发】—–J.U.C之AQS（一篇就够了）](https://juejin.im/entry/5ae02a7c6fb9a07ac76e7b70)
+6. [Java并发之AQS源码分析（一）](http://objcoding.com/2019/05/05/aqs-exclusive-lock/)

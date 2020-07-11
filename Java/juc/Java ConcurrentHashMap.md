@@ -1,4 +1,10 @@
-## Java ConcurrentHashMap
+---
+title: "Java ConcurrentHashMap"
+tags: ["java", "JUC", "集合"]
+categories: ["Java"]
+date: "2019-01-02T10:00:00+08:00"
+# toc: true
+---
 
 ### JDK 8 中 ConcurrentHashMap 为什么放弃分段锁
 

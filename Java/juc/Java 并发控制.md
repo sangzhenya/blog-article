@@ -1,4 +1,10 @@
-## 并发控制
+---
+title: "Java 并发控制"
+tags: ["java", "JUC"]
+categories: ["Java"]
+date: "2019-01-01T22:00:00+08:00"
+# toc: true
+---
 
 ### 锁
 

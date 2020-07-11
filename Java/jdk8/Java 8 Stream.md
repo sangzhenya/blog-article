@@ -1,4 +1,10 @@
-## Java 8 Stream
+---
+title: "Java 8 Stream"
+tags: ["java", "JDK8"]
+categories: ["Java"]
+date: "2019-01-03T09:00:00+08:00"
+---
+
 ### 流与集合
 #### 流
 
