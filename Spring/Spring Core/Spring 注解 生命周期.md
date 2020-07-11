@@ -1,6 +1,11 @@
-## Spring 注解 --- 初始化、销毁及赋值
+---
+title: "Spring 注解 --- 初始化、销毁及赋值"
+tags: ["Spring", "Spring 注解"]
+categories: ["Spring"]
+date: "2019-01-20T09:00:00+08:00"
+---
 
- bean 初始化和销毁方法可以通过以下四种方式指定：
+bean 初始化和销毁方法可以通过以下四种方式指定：
 
 1. 通过 Spring 提供的 `@Bean` 属性的  `initMethod` 和 `destoryMethod` 指定
 2. 通过实现 `InitializingBean`, `DisposableBean` 接口

@@ -1,4 +1,9 @@
-## 集合类 -- Map
+---
+title: "集合类 --- Map"
+tags: ["java", "集合"]
+categories: ["Java"]
+date: "2019-01-04T09:00:00+08:00"
+---
 
 ### HashMap
 

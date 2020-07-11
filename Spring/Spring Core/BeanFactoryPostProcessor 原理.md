@@ -1,4 +1,9 @@
-## Spring BeanFactoryPostProcessor 和 BeanDefinitionRegistryPostProcessor
+---
+title: "Spring BeanFactoryPostProcessor 和 BeanDefinitionRegistryPostProcessor"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-15T09:00:00+08:00"
+---
 
 `BeanFactoryPostProcessor` BeanFactory 的后置处理器；在 BeanFactory 标准初始化之后调用，所有 Bean 定义已经保存加载到 beanFactory 中但是 bean 的实例还未创建，可以操作 beanFactory 进行定制。为容器中添加一个自定义的 `BeanFactoryPostProcessoer` 如下：
 

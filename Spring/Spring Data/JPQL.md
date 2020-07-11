@@ -1,4 +1,9 @@
-## JPQL 
+---
+title: "JPA JPQL"
+tags: ["Spring", "JPA"]
+categories: ["Spring"]
+date: "2019-01-27T09:00:00+08:00"
+---
 
 JPQL  语言，即 Java Persistence Query Language 是一种和 SQL 非常相似的中间性和对象查询语言，其最终会被编译成针对于不同底层数据库的 SQL 查询，从而屏蔽掉不同数据库的差异。JPQL 的语句都是通过 Query 接口封装执行的。
 

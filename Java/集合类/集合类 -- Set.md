@@ -1,4 +1,9 @@
-## 集合类 -- Set
+---
+title: "集合类 --- Set"
+tags: ["java", "集合"]
+categories: ["Java"]
+date: "2019-01-04T10:00:00+08:00"
+---
 
 ```java
 // 用于存储数据的  hashMap

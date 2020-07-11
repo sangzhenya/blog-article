@@ -1,4 +1,9 @@
-## 集合类 --- List
+---
+title: "集合类 --- List"
+tags: ["java", "集合"]
+categories: ["Java"]
+date: "2019-01-04T08:00:00+08:00"
+---
 
 ### ArrayList
 

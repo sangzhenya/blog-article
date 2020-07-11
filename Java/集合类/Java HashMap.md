@@ -1,4 +1,9 @@
-## Java8 HashMap
+---
+title: "Java HashMap"
+tags: ["java", "集合"]
+categories: ["Java"]
+date: "2019-01-04T09:00:00+08:00"
+---
 
 HashMap 是一个用于存储 Key-Value 键值对的集合，每个键值对也叫做 Node，这些键值对分散存储在一个数组中，这个数组就是 HaspMap 的骨干。HashMap 默认大小是 16，每次自动扩展或者手动初始的时候长度都是 2 的幂。HashMap 不是线程的安全的，因为在多线程的情况下可能出现循环链表的情况。
 

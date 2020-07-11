@@ -1,4 +1,9 @@
-## JPA EntityManager 简介
+---
+title: "JPA EntityManager"
+tags: ["Spring", "JPA"]
+categories: ["Spring"]
+date: "2019-01-24T09:00:00+08:00"
+---
 
 一个简单的使用 JPA 插入数据的过程如下所示：
 

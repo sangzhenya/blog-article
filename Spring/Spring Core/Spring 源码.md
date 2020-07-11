@@ -1,4 +1,9 @@
-## Spring 源码分析
+---
+title: "Spring 源码分析"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-18T09:00:00+08:00"
+---
 
 以 `AnnotationConfigApplicationContext` 为例：
 

@@ -1,4 +1,9 @@
-## Spring Awired 原理
+---
+title: "Spring Awired 原理"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-23T09:00:00+08:00"
+---
 
 如果组件想要使用 Spring 底层的一些组件，例如 ApplicationContext，BeanFa 等等 则可以自定义组件实现 对应的 Awired 方法，在创建对象的时候，会调用接口规定的方法注入相关的组件。通过这种方式可以将 Spring 底层的一些组件注入到自定义 Bean 中。
 

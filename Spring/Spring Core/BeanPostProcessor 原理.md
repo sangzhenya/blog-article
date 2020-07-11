@@ -1,4 +1,9 @@
-## BeanPostProcessor 原理
+---
+title: "BeanPostProcessor 原理"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-16T09:00:00+08:00"
+---
 
 BeanPostProcessor 是 Spring 提供的一个钩子，可以对新创建的 Bean 进行一些定制。例如检查标记接口和包装成为代理对象。容器能够自动检测到实现了该接口的 Bean，并应用在其他的 Bean 创建过程之中。Bean Factory 允许编程方式注册 BeanPostProcessor 用于所有通过该 BeanFactory 创建的 Bean 上。
 

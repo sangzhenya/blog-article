@@ -1,4 +1,9 @@
-## Spring ApplicationListener 和 ApplicationEvent
+---
+title: "Spring ApplicationListener 和 ApplicationEvent"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-14T09:00:00+08:00"
+---
 
 用于监听容器中发布的事件进而完成事件驱动模型的开发，可以自定义一个 `ApplicationListener` 用于监听容器中发布的事件。一个简单的自定义的 ApplicationListener 如下：
 ```java

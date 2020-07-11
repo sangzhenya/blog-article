@@ -1,4 +1,9 @@
-## Spring 注解 --- 自动注入
+---
+title: "Spring 注解 --- 自动注入"
+tags: ["Spring", "Spring 注解"]
+categories: ["Spring"]
+date: "2019-01-21T09:00:00+08:00"
+---
 
 `@Autowired` 自动注入对象。
 

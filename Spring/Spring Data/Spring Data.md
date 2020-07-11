@@ -1,4 +1,9 @@
-## Spring Data
+---
+title: "Spring Data"
+tags: ["Spring", "Spring Data"]
+categories: ["Spring"]
+date: "2019-01-28T09:00:00+08:00"
+---
 
 Spring Data 用于简化数据库访问，能够减少数据访问层的开发量，只需要声明持久层接口，其他都由 Spring Data JPA 完成。支持 NoSQL 和 关系数据存储，主要目的是使数据库的访问变得更加便捷。支持的 NoSQL 有 `MongoDB`， `Neo4j`, `Redis`  和 `Hbase`，支持数据库存储技术有 `JDBC` 和 `JPA`。
 

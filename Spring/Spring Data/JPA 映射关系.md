@@ -1,4 +1,9 @@
-## JPA 映射关系
+---
+title: "JPA 映射关系"
+tags: ["Spring", "JPA"]
+categories: ["Spring"]
+date: "2019-01-26T09:00:00+08:00"
+---
 
 对于一对多的情况使用一个 Department 类和一个 Student 类。
 

@@ -1,4 +1,9 @@
-## Spring 注解 --- 组件注册
+---
+title: "Spring 注解 --- 组件注册"
+tags: ["Spring", "Spring 注解"]
+categories: ["Spring"]
+date: "2019-01-19T09:00:00+08:00"
+---
 
 `@Configuration` 把当前文件用作配置类。
 

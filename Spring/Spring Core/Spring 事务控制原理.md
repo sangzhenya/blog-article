@@ -1,4 +1,9 @@
-## Spring 事务控制原理
+---
+title: "Spring 事务控制原理"
+tags: ["Spring", "源码"]
+categories: ["Spring"]
+date: "2019-01-17T09:00:00+08:00"
+---
 
 使用 Spring 注解的方式启用事务，首先要使用 `@EnableTransactionManagement` 注解开启全局事务，事务需要交给具体的 TransactionManager 进行管理，所以需要向容器中添加相应的 Bean，如下所示
 
