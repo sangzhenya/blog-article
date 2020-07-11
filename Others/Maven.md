@@ -1,4 +1,9 @@
-## Maven 入门
+---
+title: "Maven 入门"
+tags: ["Maven"]
+categories: ["其他"]
+date: "2019-04-23T09:00:00+08:00"
+---
 
 ### 构建的各个环节
 

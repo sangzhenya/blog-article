@@ -1,4 +1,9 @@
-## 自定义拦截器
+---
+title: "Spring MVC 自定义拦截器"
+tags: ["Spring", "Spring MVC"]
+categories: ["Spring"]
+date: "2019-02-09T09:00:00+08:00"
+---
 
 Spring MVC 也可以使用拦截器对请求进行拦截处理，用户可以自定义拦截器来实现特定的功能，自定义的拦截器必须实现 `HandlerInterceptor` 接口，其主要有三个方法：
 

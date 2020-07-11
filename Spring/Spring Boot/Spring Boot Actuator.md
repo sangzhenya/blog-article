@@ -1,4 +1,9 @@
-## Actuator
+---
+title: "Spring Boot Actuator"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-03-07T09:00:00+08:00"
+---
 
 通过引入 `spring-boot-starter-actuator` 可以使用 Spring Boot 为我们提供的应用的监控和管理功能。可以通过 HTTP，JMX，SSH 协议进行操作，自动得到审计、健康及指标信息。pom 文件中设置如下：
 

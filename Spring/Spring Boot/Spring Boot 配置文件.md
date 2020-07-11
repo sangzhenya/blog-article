@@ -1,4 +1,9 @@
-## Spring Boot 配置文件
+---
+title: "Spring Boot 配置文件"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-02-19T09:00:00+08:00"
+---
 
 Spring Boot 默认使用 properties 文件来配置属性，也可以使用 YAML 文件进行配置。YAML 以数据为中心，比 json 和 xml 等更适合做配置文件。
 

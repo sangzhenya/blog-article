@@ -1,4 +1,9 @@
-## Config Server
+---
+title: "Spring Cloud Config Server"
+tags: ["Spring", "Spring Cloud"]
+categories: ["Spring"]
+date: "2019-03-11T09:00:00+08:00"
+---
 
 微服务意味着将单体应用的业务拆分成一个个子服务，每个服务的粒度相对较小，因此系统中会出现大量的服务。由于每个服务都需要必要的配置信息才能运行，所以一套集中式，动态的配置管理是必要的。Spring Cloud 提供了 Config Server 来解决这个问题，其为微服务架构中的微服务提供集中化的外部配置支持，配置服务器为各个不同微服务的应用的所有环境提供了一个中心化的外部配置。
 

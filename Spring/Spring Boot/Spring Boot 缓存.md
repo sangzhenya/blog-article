@@ -1,6 +1,9 @@
-## 缓存
-
-[toc]
+---
+title: "Spring Boot 缓存"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-02-21T09:00:00+08:00"
+---
 
 ### JSR 107
 

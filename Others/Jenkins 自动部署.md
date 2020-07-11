@@ -1,4 +1,9 @@
-# Jenkins 自动部署
+---
+title: "Jenkins 自动部署"
+tags: ["Jenkins"]
+categories: ["其他"]
+date: "2019-04-19T09:00:00+08:00"
+---
 
 博客后台每次 build 之后都需手动放到服务器上，然后停掉原本的服务，重新启动服务。为了简化流程所以使用 Jenkins 进行自动化部署。
 

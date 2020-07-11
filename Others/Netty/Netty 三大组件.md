@@ -1,3 +1,10 @@
+---
+title: "Netty 三大组件"
+tags: ["Netty", "源码"]
+categories: ["Netty"]
+date: "2019-03-25T09:00:00+08:00"
+---
+
 ## ChannelPipeline, ChannelHandler 和 ChannelHandlerContext
 
 三者的关系是每当 ServerSocket 创建一个新的连接，就会创建一个 Socket 对应的就是目标客户端。每一个新创建的 Socket 都将会分配一个全新的 ChannelPipeline。每个 ChannelPipeline 包含多个 ChannelHandlerContext，其是一个双向链表，包装了通过 addLast 方法添加的 ChannelHandler。

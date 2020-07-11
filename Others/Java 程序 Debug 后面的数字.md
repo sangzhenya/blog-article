@@ -1,4 +1,9 @@
-# Debug Java 程序 对象后面的数字是什么？
+---
+title: "Debug Java 程序 对象后面的数字是什么"
+tags: ["Debug"]
+categories: ["其他"]
+date: "2019-04-17T09:00:00+08:00"
+---
 
 在 Debug Java 程序的时候，在 IDEA 的 Variables 窗口中经常可以看到类似下图形式的变量：
 

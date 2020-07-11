@@ -1,4 +1,9 @@
-## 自定义 Starter
+---
+title: "Spring Boot 自定义 Starter"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-03-03T09:00:00+08:00"
+---
 
 Starter 只是用来引入自动配置模块，Starter 依赖自动配置，其他人使用的时候只需要引入 Starter 即可。另外对于我们自己实现的 Starter 推荐命名是 `xxx-spring-boot-starter`。
 

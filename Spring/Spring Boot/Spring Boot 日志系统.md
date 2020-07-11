@@ -1,4 +1,9 @@
-## Spring Boot 日志
+---
+title: "Spring Boot 日志"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-02-25T09:00:00+08:00"
+---
 
 开发用到的框架大概有：JUL、JCL、Jboss-logging、logback、log4j、log4j2、slf4j....。其中 JCL， SLF4J， Jboss-logging 是日志门面，log4j, jul, log4j, Logback 是日志的实现. Spring  Boot 选用的是 SLF4J 和 Logback 的实现。依赖如下：
 

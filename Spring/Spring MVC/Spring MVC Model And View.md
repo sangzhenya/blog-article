@@ -1,6 +1,9 @@
-## Model And View
-
-
+---
+title: "Spring MVC Model And View"
+tags: ["Spring", "Spring MVC"]
+categories: ["Spring"]
+date: "2019-02-11T09:00:00+08:00"
+---
 
 ![ModelAndView](http://img.programya.com/Snipaste_2019-12-13_16-49-52.png)
 

@@ -1,4 +1,9 @@
-## Nginx
+---
+title: "Nginx"
+tags: ["Nginx"]
+categories: ["Nginx"]
+date: "2019-04-09T09:00:00+08:00"
+---
 
 Nginx 是一个高性能的 HTTP 和反向代理服务器，占用内存少，并发能力强，可以作为静态页面的 Web 服务器，同时支持 CGI 协议的动态语言，例如 perl、php 等。但是不支持 Java，Java 程序只能通过 Tomcat 的配合完成。Nginx 专为性能优化开发，性能是其最重要的考量，非常注重效率，能够经受住高负载的考研。
 

@@ -1,4 +1,9 @@
-## Java IO 模型
+---
+title: "Netty Java IO 模型"
+tags: ["Netty", "源码"]
+categories: ["Netty"]
+date: "2019-04-07T09:00:00+08:00"
+---
 
 Java 模型简单的理解就是使用什么样的通道惊醒数据的发送和接收，这很大程度上决定了程序通讯的性能。Java 支持 3 种网络编程模型 IO：BIO，NIO，AIO。
 

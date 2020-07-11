@@ -1,4 +1,9 @@
-## Spring Boot 自动配置
+---
+title: "Spring Boot 自动配置"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-03-05T09:00:00+08:00"
+---
 
 众所周知 Spring Boot 极大的减少了 Spring 繁琐的配置，采用约定大于配置的策略。也是基于此 Spring Boot 有很多自动配置的逻辑，下面简单理一下相关的代码。
 

@@ -1,4 +1,9 @@
-## Netty 心跳机制
+---
+title: "Netty 心跳机制"
+tags: ["Netty", "源码"]
+categories: ["Netty"]
+date: "2019-04-01T09:00:00+08:00"
+---
 
 Netty 提供了一个重要的服务心跳机制 heartbeat。通过心跳检查对方是否有效，这是 RPC 框架中必不可少的功能。接下来分析相关源码的实现。
 

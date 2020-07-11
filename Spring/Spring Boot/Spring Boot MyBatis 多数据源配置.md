@@ -1,4 +1,9 @@
-# Spring Boot + MyBatis 多数据源配置
+---
+title: "Spring Boot MyBatis 多数据源配置"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-03-09T09:00:00+08:00"
+---
 
 主要有两种配置方式：第一种是自定义配置 `SqlSessionFactory` ，第二种是使用 `AbstractRoutingDataSource  + AOP` 的方式实现
 

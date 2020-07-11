@@ -1,4 +1,9 @@
-## Spring MVC 运行流程
+---
+title: "Spring MVC 运行流程"
+tags: ["Spring", "Spring MVC"]
+categories: ["Spring"]
+date: "2019-02-05T09:00:00+08:00"
+---
 
 调用的起点是 `org.springframework.web.servlet.DispatcherServlet#doService` 方法
 

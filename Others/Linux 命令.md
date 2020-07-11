@@ -1,4 +1,9 @@
-## Linux 命令
+---
+title: "Linux 命令"
+tags: ["Linux"]
+categories: ["其他"]
+date: "2019-04-21T09:00:00+08:00"
+---
 
 强制卸载软件：
 

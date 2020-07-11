@@ -1,4 +1,9 @@
-## 嵌入式容器
+---
+title: "Spring Boot 嵌入式容器"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-02-23T09:00:00+08:00"
+---
 
 ### 对于嵌入式容器的配置
 

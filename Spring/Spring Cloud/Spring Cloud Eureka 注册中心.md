@@ -1,4 +1,9 @@
-## Eureka
+---
+title: "Spring Cloud Eureka"
+tags: ["Spring", "Spring Cloud"]
+categories: ["Spring"]
+date: "2019-03-15T09:00:00+08:00"
+---
 
 Eureka 是 Netflix 的一个子模块，也是核心模块之一。Eureka 是一个基于 REST 的服务，用于定位服务，实现云端中间层服务发现与故障转移。服务注册与发现对于微服务是非常的重要的，有了服务注册与发现只需要使用服务的标识符，就昆虫访问到服务，而不需要修改服务调用的配置文件。功能和 Dubbo 的注册中心类似。Eureka 遵守的 CAP 原则中的 AP 原则。
 

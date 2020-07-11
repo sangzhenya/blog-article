@@ -1,4 +1,9 @@
-## Netty 
+---
+title: "Netty 主要组件"
+tags: ["Netty", "源码"]
+categories: ["Netty"]
+date: "2019-04-03T09:00:00+08:00"
+---
 
 Netty 的主要组件有 Channel， EventLoop，ChannelFuture，ChannelHandler，ChannelPipeline 等。
 

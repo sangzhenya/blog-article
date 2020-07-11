@@ -1,4 +1,9 @@
-## Spring Boot 错误处理机制
+---
+title: "Spring Boot 错误处理机制"
+tags: ["Spring", "Spring Boot"]
+categories: ["Spring"]
+date: "2019-02-17T09:00:00+08:00"
+---
 
 Spring 针对于浏览器访问和客户端访问使用不同的处理逻辑。如果是浏览器则返回一个出错的网页，而如果是客户端则返回 JSON 格式的错误数据。其处理的原理如下：
 

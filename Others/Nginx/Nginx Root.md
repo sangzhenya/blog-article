@@ -1,4 +1,9 @@
-## Nginx proxy pass, root alias
+---
+title: "Nginx Root"
+tags: ["Nginx"]
+categories: ["Nginx"]
+date: "2019-04-11T09:00:00+08:00"
+---
 
 ### proxy_pass
 proxy_pass 一般有四种设置方式, 例如访问 index.html 页面：

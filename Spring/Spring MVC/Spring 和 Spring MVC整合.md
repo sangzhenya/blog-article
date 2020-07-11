@@ -1,4 +1,9 @@
-## Spring 和 Spring MVC 整合
+---
+title: "Spring 和 Spring MVC 整合"
+tags: ["Spring", "Spring MVC"]
+categories: ["Spring"]
+date: "2019-02-01T09:00:00+08:00"
+---
 
 Web 容器启动的时候会扫描每个 jar 包下的 `META-INF\services\javax.servlet.ServletContainerInitializer` 文件中的内容，根据文件中的定义全类名找到 `ServletContainerInitializer` 的子类，然后调用其 `onStartup` 方法。在引入的 `spring-web`  下就有这样的一个文件，其内容是 `org.springframework.web.SpringServletContainerInitializer`， 即定义了一个  `SpringServletContainerInitializer`， 容器启动的时候会执行该类的 `onStartup` 方法。其内容如下：
 

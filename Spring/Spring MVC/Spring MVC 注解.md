@@ -1,4 +1,9 @@
-## Spring MVC @RequestMapping 注解
+---
+title: "Spring MVC @RequestMapping 注解"
+tags: ["Spring", "Spring MVC"]
+categories: ["Spring"]
+date: "2019-02-07T09:00:00+08:00"
+---
 
 SpringMVC 使用 @RequestMapping 注解为控制器指定可以处理哪些 URL 请求，在 Controller  的类和方法上都可以使用该注解，标记在类上提供初步的请求映射信息，相对于 Web 应用的根目录。标记在方法上提供进一步细分映射信息，对于标记在类上的 URL，如果方法所在的类未标注则  URL 是相对于 Web 应用的根目录。在 `DispatcherServlet` 截获请求后，就通过 @RequestMapping 提供的映射信息确定请求所对应的处理方法。RequestMapping  注解源码：
 
