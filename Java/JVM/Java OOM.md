@@ -2,7 +2,7 @@
 title: "Java OOM"
 tags: ["Java", "JVM"]
 categories: ["Java"]
-date: "2020-03-07T09:00:00+08:00"
+date: "2019-03-07T09:00:00+08:00"
 ---
 
 ![Exception & Error](https://i.loli.net/2019/06/18/5d08fb6bd193464754.png)
