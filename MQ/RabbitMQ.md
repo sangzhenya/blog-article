@@ -5,6 +5,10 @@ categories: ["MQ"]
 date: "2019-06-03T09:00:00+08:00"
 ---
 
+[toc]
+
+
+
 ### 概述
 
 多数应用中可以通过消息服务中间件来提升系统异步通信、扩展解耦的能力。其有两个重要的概念：消息代理和目的地。当消息发送者发送消息后，将由消息代理接管，消息代理保证消息传递到指定的目的地。
@@ -45,7 +49,7 @@ Rabbit MQ 是一个由 erlang 开发的 AMQP 的开源实现，主要有以下�
 6. Connection，网络连接，例如一个 TCP 连接。
 7. Channel，信道，多路复用连接中的一条独立的双向数据流通道。信道是建立在真实的 TCP 连接内的虚拟连接，AMQP 命令都是通过信道发送出去的，不管是发布消息，订阅队列还是接收消息，这些动作都是通过信道完成。因为对于操作系统来说建立和销毁 TCP 都是非常昂贵的开销，所以引入了信道的概念，以复用一条 TCP 连接。
 8. Consumer 消息消费者，表示一个从消息队列中取得消息的客户端应用程序。
-9. Virtual Host 虚拟主机，表示一批交换器、消息队列和相关对象。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个mini 的 RabbitMQ 的服务器，用于自己的队列，交换器，绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接的时候指定。RabbitMQ 默认 vhost 是 /。
+9. Virtual Host 虚拟主机，表示一批交换器、消息队列和相关对象。类似数据库的一个 DB。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个mini 的 RabbitMQ 的服务器，用于自己的队列，交换器，绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接的时候指定。RabbitMQ 默认 vhost 是 /。
 10. . Broker 表示消息队列服务器实体。
 
 结构图如下：
@@ -87,6 +91,17 @@ Headers Exchange：其匹配的是 AMQP 消息的 Header，而不是使用路由
   <groupId>org.springframework.boot</groupId>
   <artifactId>spring-boot-starter-amqp</artifactId>
 </dependency>
+```
+
+属性配置如下：
+
+```yaml
+spring:
+  rabbitmq:
+    addresses: localhost
+    username: guest
+    password: guest
+    virtual-host: /
 ```
 
 需要使用 `@EnableRabbit` 注解启用，然后看一下自动配置的原理。从 `RabbitAutoConfiguration` 开始，其为容器中引入了 `rabbitConnectionFactory`  连接工厂，连接到 RabbitMQ Server, `RabbitTemplate` 用于发送接收 MQ 数据（类似 JDBC Template 等 Template）, `AmqpAdmin`  管理 AMPQ 创建删除 Exchange，Queue，Binding 等等。另外还为容器中引入了`RabbitAnnotationDrivenConfiguration` Config 类，这个配置类引入了一些配置信息。
