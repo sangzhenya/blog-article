@@ -50,7 +50,7 @@ Rabbit MQ 是一个由 erlang 开发的 AMQP 的开源实现，主要有以下�
 7. Channel，信道，多路复用连接中的一条独立的双向数据流通道。信道是建立在真实的 TCP 连接内的虚拟连接，AMQP 命令都是通过信道发送出去的，不管是发布消息，订阅队列还是接收消息，这些动作都是通过信道完成。因为对于操作系统来说建立和销毁 TCP 都是非常昂贵的开销，所以引入了信道的概念，以复用一条 TCP 连接。
 8. Consumer 消息消费者，表示一个从消息队列中取得消息的客户端应用程序。
 9. Virtual Host 虚拟主机，表示一批交换器、消息队列和相关对象。类似数据库的一个 DB。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个mini 的 RabbitMQ 的服务器，用于自己的队列，交换器，绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接的时候指定。RabbitMQ 默认 vhost 是 /。
-10. . Broker 表示消息队列服务器实体。
+10. Broker 表示消息队列服务器实体。
 
 结构图如下：
 
@@ -58,9 +58,11 @@ Rabbit MQ 是一个由 erlang 开发的 AMQP 的开源实现，主要有以下�
 
 RabbitMQ 启动后默认使用两个端口，一个 15672 作为 Web 管理端口，一个是 5672 作为通讯端口。
 
-### Rabbit MQ 运行机制
+### Rabbit MQ 工作模式
 
-首先看一下 AMQP 中的消息路由，其和 Java 开发者熟悉的 JMS 存在一些差别，AMQP 中增加了 Exchange 和 Binding 的校色。生产中把消息发布到 Exchange上，消息最终到达队列并被消费者接收，而 Binding 决定交换器的消息应该发送到哪个队列。结构如下：
+Rabbit MQ 可以不使用 Exchange 而直接将 Message 发送到 Queue，Consumer 从 Queue 中读取数据，就是简单的消息队列模式，当然一个 Queue 可以设置一个或者多个 Consumer，相同 Queue 直接的 Consumer 是竞争关系。
+
+另外看一下 AMQP 中的消息路由，其和 Java 开发者熟悉的 JMS 存在一些差别，AMQP 中增加了 Exchange 和 Binding 的校色。生产中把消息发布到 Exchange上，消息最终到达队列并被消费者接收，而 Binding 决定交换器的消息应该发送到哪个队列。结构如下：
 
 ![结构如下](https://i.loli.net/2020/07/04/mGzcrdZAPMaCFgU.png)
 
@@ -81,6 +83,195 @@ Topic Exchange：其通过模式匹配分配消息，可以将 Routing Key 和�
 ![Topic Exchange](https://i.loli.net/2020/07/04/dDxSAmW9IFM6nf8.png)
 
 Headers Exchange：其匹配的是 AMQP 消息的 Header，而不是使用路由键，Headers Exchange 和 Direct Exchange 几乎一致，但是性能却差很多，所以一般情况使用不到。
+
+
+#### 生产者和消费者流转过程
+
+生产者流转过程：
+
+1. 客户端与代理服务器 Broker 建立连接。会调用 `newConnection` 方法，该方法会封装 Protocol Header 0-9-1 的报文，以此通知 Broker 在本次交互采用的是 AMQPO-9-1 协议，然后 Broker 返回  `Connection.Start` 来建立连接。
+2. 客户端调用 `connect.createChannel` 方法，此方法开启信道，其包装的 `Channel.open` 命令发送给 Broker，等待 `Channel.basicPublish` 方法，对应的 AMQP 命令为 `Basic.Publish` 这个命令包含 Content Header 和 Content Body 两部分，Content Header 包含消息体属性：投递模式，优先级等。Content Body 就是消息体。
+3. 客户端发送完消息需要关闭资源的时候，设计到 `Channel.Close`, `Channel.Close-Ok`, `Connection.Close`, `Connection.Close-Ok` 的命令交互。
+
+流程图如下：
+
+![image-20200718090606068](https://i.loli.net/2020/07/18/dyagoKul3npZ6DU.png)
+
+消费者流转过程：
+
+1. 客户端与代理服务器 Broker 建立连接。与生产者一样
+2. 客户端开启信道。与生产者一样。
+3. 在真正消息之前，消费者客户端需要向 Broker 发送 `Basic.Consume` 方法，将 Channel 设置为接收模式，之后 Broker 回执 `Basic.Consume-OK` 告诉消费者准备好接收消息。
+4. Broker 向消费者推送消息，即 `Basic.Deliver` 命令，这个命令和 `Basic.Publish` 命令一样会带有 Content Header  和 Content  Body。
+5. 消费者接收并正确消费之后，向 Broker 发送确认 `Basic.ACK` 命令。
+6. 客户端接收完消息关闭资源。与生产者一样。
+
+流程图如下：
+
+![image-20200718090745729](https://i.loli.net/2020/07/18/UvsDzNfILuhn1T9.png)
+
+
+
+### RabbitMQ 的几个概念
+
+#### 过期时间
+
+RabbitMQ 可以对消息设置过期时间 TTL ，在这个时间内可以被消费者消费，过期之后自动删除。Rabbit MQ 可以通过两种方式设置 TTL：
+
+1. 设置 Queue 属性设置，则 Queue 中所有的消息都有相同的 TTL。
+2. 对消息进行单独设置，每条消息的 TTL 可以不同。
+
+在 Web 控制台中新建 Queue 的时候可以直接设置参数如下：
+
+![image-20200718112330186](https://i.loli.net/2020/07/18/U84eEWuVAnQJ7gi.png)
+
+
+
+通过代码声明 Queue 的时候可以使用如下：
+
+```java
+Queue queue = new Queue("demo-ttl", true, false, false, Collections.singletonMap("x-message-ttl", 12000));
+amqpAdmin.declareQueue(queue);
+```
+
+对于单独 Message 设置可以通过 MessageProperties 的 expiration 属性设置，如下：
+
+```java
+MessageProperties messageProperties = new MessageProperties();
+messageProperties.setExpiration("12000");
+```
+
+上面 TTL 的单位都是毫秒，如果同时指定了 Queue 与 Message 的 TTL，两者中最小的那个起作用。
+
+#### 死信队列
+
+首先看一下 DLX (Dead Letter Exchange) 即死信交换机。当有一个消息变为死信的时候，其能被重新发送到另外一个交换机中。这交换机就是 DLX，绑定 DLX 的队列被称为死信队列。消息变为死信的原因有以下几种可能：消息被拒绝；消息过期；队列达到最大长度。
+
+DLX 也是一个正常的交换机，和一般的交换机没有区别，其能在任何队列上被指定。当这个队列存在死信的时候，RabbitMQ 就会自动将这个消息重新发布到设置的 DLX 上去，进而被路由到另外一个队列中（死信队列）。
+
+在 Web 控制台设置如下：
+
+首先有一个正常的 Exchange 例如 **demo.direct**，一个 DLX 例如： **demo.dlx**。然后一个正常的 Queue 例如：**demo.news.queue**，在创建该 Queue 的时候设置 `x-dead-letter-exchange` 属性指向 DLX。如下图所示：
+
+![image-20200718115747273](https://i.loli.net/2020/07/18/Ogy7MtLHhZ4NeTE.png)
+
+然后需要一个死信队列例如：**demo.news.dlx**。并使用 `demo-ttl-dlx` 绑定 key 绑定到 DLX (demo.dlx)。然后将正常的 Exchange (demo.direct) 和 正常的 Queue (demo.news.queue) 使用 `demo-ttl-dlx` 绑定 key 绑定。
+
+然后向 demo.direct 上发送路由 key 为 `demo-ttl-dlx` 的 Message 并设置 TTL，在 TTL 的时间范围内可以看到在 demo.news.queue 上存在该消息。当超过了 TTL 之后可以看到该消息已经被发送到了 demo.news.dlx 上。
+
+![image-20200718121118663](https://i.loli.net/2020/07/18/1JaEzft2xoIpPrS.png)
+
+这里和正常创建唯一的不同即是通过 properties 指定死信队列的位置，在代码中同样也是通过配置属性指定：
+
+```java
+Queue queue = new Queue("demo-news.queue", true, false, false, Collections.singletonMap("x-dead-letter-exchange", "demo.dlx"));
+amqpAdmin.declareQueue(queue);
+```
+
+#### 延迟队列
+
+延迟队列顾名思义即存储延迟消息的队列，即消息发送出去以后不想立刻被消费者拿到，而是等待特定的时间后，消费者才能拿到这个消息进行消费。在 RabbitMQ 没有直接提供这样的方式，但是可以通过 TTL + DLX 的方式实现，为正常 Queue（或者说中转 Queue）设置一个 TTL，然后设置其 DLX，在 DLX 上绑定到真正消费消息的 Queue 上。这样就实现了延迟队列。
+
+#### 消息确认
+
+确保消息被送达有两种方式：发布确认和事务。但是二者只能选择一个，如果使用事务则不能使用确认模式，反之亦然。
+
+##### 使用消息确认
+
+如果要启用消息确认可以在配置文件中配置：
+
+```yaml
+spring:
+  rabbitmq:
+    publisher-confirm-type: correlated # 是否到 Broker Callback
+    publisher-returns: true # 是否到 Queue Callback
+```
+
+然后可以在 `rabbitTemplate` 设置相应的 `callback` 如下所示：
+
+```java
+String demoRoutingKey = "usa.news";
+String demoExchange = "demo.direct";
+byte[] messageBody = new ObjectMapper().writeValueAsBytes(Collections.singletonMap("id", 1));
+MessageProperties messageProperties = new MessageProperties();
+messageProperties.setReceivedRoutingKey(demoRoutingKey);
+messageProperties.setReceivedExchange(demoExchange);
+Message sendMessage = new Message(messageBody, messageProperties);
+rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
+  log.info(ack);
+  log.info(cause);
+  log.info(correlationData);
+});
+rabbitTemplate.setReturnCallback((message, replyCode, replyText, exchange, routingKey) -> {
+  log.info(message);
+  log.info(replyCode);
+  log.info(replyText);
+  log.info(exchange);
+  log.info(routingKey);
+});
+// 如果配置了 publisher-returns 且没有配置 mandatory 为 false 则默认 mandatory 为 true
+//rabbitTemplate.setMandatory(true);
+CorrelationData correlationData = new CorrelationData();
+correlationData.setId(UUID.randomUUID().toString());
+correlationData.setReturnedMessage(sendMessage);
+rabbitTemplate.send(demoExchange, demoRoutingKey, sendMessage, correlationData);
+```
+
+#####  使用事务
+
+如果业务处理伴随着消息的发送，那么业务处理失败后，事务回滚，且消息不发送出去。简单示例代码如下：
+
+```java
+@Configuration
+public class RabbitConfig {
+  	// 引入事务管理器
+    @Bean
+    public TransactionManager transactionManager(ConnectionFactory connectionFactory) {
+        return new RabbitTransactionManager(connectionFactory);
+    }
+}
+```
+
+```java
+// 标注以事务模式发送消息
+@Transactional(rollbackFor = Exception.class)
+public void testTransacted() {
+  rabbitTemplate.setChannelTransacted(true);
+  rabbitTemplate.convertAndSend("demo.direct", "usa.news", "12123");
+  //        int a = 1 / 0;
+}
+```
+
+如果使用了事务那么在发送之前会调用 Channel 的 `txSelect` 方法主要是将 Channel 设置成事务模式，事务成功后会调用 `txCommit` 提交事务，失败则调用 `txRollback` 回滚事务。
+
+#### 消息追踪
+
+消息中心的消息追踪需要通过 Trace 实现，Trace 是 RabbitMQ 用于记录每一次发送的消息，方便使用 RabbitMQ 开发调试。可通过插件形式提供可视化解码。Trace 启动后自动会创建 amq.rabbitmq.trace Exchange，每个队列都会自动绑定该 Exchange，绑定后发送给队列的消息都会记录到 Trace 日志中。
+
+常用的命令如下：
+
+1. rabbitmq-plugins list
+2. rabbitmq-plugins enable rabbitmq_tracing
+3. rabbitmq-plugins disable rabbitmq_tracing
+4. rabbitmqctl trace_on
+5. rabbitmqctl trace_off
+6. rabbitmqctl set_user_tags guest administrator
+
+在 enable 的 rabbitmq_tracing 后，在 Web 管理的 admin 界面就可以看到了 tracing tab。
+
+![image-20200718163525694](https://i.loli.net/2020/07/18/xEYOU9cKrwIe1XJ.png)
+
+然后可以添加一个 Trace 
+
+![image-20200718163550603](https://i.loli.net/2020/07/18/72LjJ8g4GKwlQqF.png)
+
+然后就会显示所有 Trace 了：
+
+![image-20200718163608828](https://i.loli.net/2020/07/18/3FoM54xTJcYpUag.png)
+
+点击 demo-trace.log 便可以查看 Trace 的信息
+
+![image-20200718163836919](https://i.loli.net/2020/07/18/j8ykWQdm9IeoJTD.png)
 
 ### Spring Boot 中使用 RabbitMQ
 
@@ -213,5 +404,96 @@ public void admin() {
 }
 ```
 
+### RabbitMQ 集群
 
+#### RabbitMQ 自定义监控
 
+RabbitMQ 提供了很多 resultFul 风格的 api 接口，可以通过这些接口带错对应的集群数据，可以通过这种方式定制监控系统。
+
+| HTTP API URL                          | HTTP请求类型   | 接口含义                                                     |
+| ------------------------------------- | -------------- | ------------------------------------------------------------ |
+| /api/connections                      | GET            | 获取当前RabbitMQ集群下所有打开的连接                         |
+| /api/nodes                            | GET            | 获取当前RabbitMQ集群下所有节点实例的状态信息                 |
+| /api/vhosts/{vhost}/connections       | GET            | 获取某一个虚拟机主机下的所有打开的connection连接             |
+| /api/connections/{name}/channels      | GET            | 获取某一个连接下所有的管道信息                               |
+| /api/vhosts/{vhost}/channels          | GET            | 获取某一个虚拟机主机下的管道信息                             |
+| /api/consumers/{vhost}                | GET            | 获取某一个虚拟机主机下的所有消费者信息                       |
+| /api/exchanges/{vhost}                | GET            | 获取某一个虚拟机主机下面的所有交换器信息                     |
+| /api/queues/{vhost}                   | GET            | 获取某一个虚拟机主机下的所有队列信息                         |
+| /api/users                            | GET            | 获取集群中所有的用户信息                                     |
+| /api/users/{name}                     | GET/PUT/DELETE | 获取/更新/删除指定用户信息                                   |
+| /api/users/{user}/permissions         | GET            | 获取当前指定用户的所有权限信息                               |
+| /api/permissions/{vhost}/{user}       | GET/PUT/DELETE | 获取/更新/删除指定虚拟主机下特定用户的权限                   |
+| /api/exchanges/{vhost}/{name}/publish | POST           | 在指定的虚拟机主机和交换器上发布一个消息                     |
+| /api/queues/{vhost}/{name}/get        | POST           | 测在指定虚拟机主机和队列名中获取消息，同时该动作会修改队列状态试 |
+| /api/healthchecks/node/{node}         | GET            | 获取指定节点的健康检查状态                                   |
+| /api/nodes/{node}/memory              | GET            | 获取指定节点的内存使用信息                                   |
+
+可以通过 http://localhost:15672/api/index.html 页面看到相关的信息。可以通过程序获取这些监控数据，做自定义监控。
+
+#### RabbitMQ 集群架构
+
+RabbitMQ 集群架构有两种模式：
+
+##### 主备模式
+
+用来实现 RabbitMQ 的高可用集群，一般是在并发和数据不是特别多的时候使用，当主节点挂掉以后从备份节点中选择一个节点作为主节点对外提供服务。
+
+![](https://i.loli.net/2020/07/18/mZW3TCKFztNJQUi.png)
+
+消费者通过 HA Proxy 访问主节点，当主节点挂掉以后 HAProxy 会帮助我们把备份节点切换成主节点对外提供服务。
+
+HA 的部分配置如下：
+
+```shell
+server s1 ip1:port check inter 5000 rise 2 fall 2 #主节点
+server s2 ip2:port backup check inter 5000 rise 2 fall #2 备份节点
+```
+
+inter 代表每 5 秒钟对集群做一次健康检查， raise 2 代表 2 次正常则服务可用，2 次 失败代表服务失败服务不可用，backup 代表备份节点。
+
+##### 远程模式
+
+主要用来实现双活，简称 Shovel 模式，即让我们可以把消息复制到不同的数据中心，让两个地域集群互联。
+
+![](https://i.loli.net/2020/07/18/4hkwLCIzNyVZO1Q.png)
+
+##### 镜像模式
+
+镜像队列也被称为 Mirror 队列，主要用来保证 MQ 消息的可靠性，其通过消息复制的方式保证消息 100% 不丢失，同时该集群模式也是企业中使用最多的模式。
+
+![image-20200719000814483](https://i.loli.net/2020/07/19/Ng2AxHuKowhLbyO.png)
+
+使用 HAProxy 做负载均衡，同时因为当前节点也可能挂掉，所以受用 KeepAlive 漂移到另一个 HAProxy 节点提供服务。任意一个 MQ 节点收到用户发过来的消息都会将消息复制给其他节点，任意一个节点挂掉，在其他节点都存在该消息，消息并不会随着一个节点挂掉而消失。
+
+备注：HAProxy 是一款提供高可用性，负载均衡基于 TCP和HTTP应用代理软件，借助 HAProxy 可以快速可靠的提供基于 TCP/HTTP应用的代理解决方案。其适用于大型 web 站点，这些站点通常又需要会话保持或七层处理。HAProxy 可以支持数以万计的并发连接并且 HAProxy 的运行模式使得它可以很简单安全的整合进架构中，同时可以保护 Web 服务器不暴露在网络上。
+
+KeepAlived 是一个高性能的服务器可用或热备解决方案，KeepAlived 主要来防止服务器单点故障的发生问题，可以通过其与 Nginx，HAProxy 等反向代理的负载均衡配合实现 Web 服务端的高可用，KeepAlived 以 VRRP 协议为实现基础，用 VRRP 协议来实现高可用性，VRRP 协议是用来实现路由器冗余的协议，VRRP 协议将两台或多台路由器设备虚拟成一个设备，对外提供一个虚拟路由 IP (一个或多个)。
+
+##### 多活模式
+
+多活模式主要用来实现异地数据复制，Shovel 模式其实也可以实现，但是其配置比较繁琐且受到版本的限制，如果做异地多活可以使用多活模式，即借助 Federation 插件来实现集群与集群之间或者节点与节点之间的消息复制。
+
+![image-20200718235404692](https://i.loli.net/2020/07/18/etDumdvLgFEpNPI.png)
+
+当用户发送一条 MQ 消息过来使用 LBS 做负载均衡，到了集群 1，集群 1 在接收到该消息后就会使用 Federation 插件把该条消息复制集群 2，集群一般情况都使用镜像队列的方式而不是使用集群与集群之间的复制，只需要将集群 1 的某一个节点的数据复制到集群 2 的某一个节点上，然后集群 2 的节点会使用镜像队列的方式自己去同步到所有的节点上。
+
+### RabbitMQ 其他
+
+#### 消息堆积
+
+当生产消息的速度长时间远远大于消费速度的时候就会造成消息堆积。
+
+消息堆积坑影响：导致新消息无法进入队列，就消息无法丢失，消息等待消费时间过长。
+
+出现堆积情况的有以下几种情况：生产者突然大量发布消息，消费者消费失败，消费者出现性能瓶颈。
+
+解决方案：排查消费者性能瓶颈，增加消费者的多线程处理，部署增加多个消费者。
+
+#### 消息丢失
+
+#### 有序消息消费
+
+#### 重复消息
+
+### 
