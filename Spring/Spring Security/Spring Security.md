@@ -557,3 +557,270 @@ public PasswordEncoder passwordEncoder() {
 
 因为使用的是随机数作为盐，所以同一个字符串每次 `encode` 出来加密结果并不一致，其提供了 `matches` 方法，可以判断两个加密过的字符串的原本字符串是否相同。
 
+### Remember Me 功能
+
+如何没有配置 `rememberMe`, 则使用 `NullRememberMeServices` 表示不进行处理。如果配置了之后为容器增加一个 `RememberMeAuthenticationFilter` ，第一次登陆成功之后会记录 `remeberMe`，先是在 `AbstractRememberMeServices` 中：
+
+```java
+public final void loginSuccess(HttpServletRequest request,
+                               HttpServletResponse response, Authentication successfulAuthentication) {
+	// 在请求中找 rememberme 的标记
+  if (!rememberMeRequested(request, parameter)) {
+    logger.debug("Remember-me login not requested.");
+    return;
+  }
+  onLoginSuccess(request, response, successfulAuthentication);
+}
+```
+
+然后在 `TokenBasedRememberMeServices` 中处理：
+
+```java
+// TokenBasedRememberMeServices
+public void onLoginSuccess(HttpServletRequest request, HttpServletResponse response,
+                           Authentication successfulAuthentication) {
+	// 获取用户名和密码
+  String username = retrieveUserName(successfulAuthentication);
+  String password = retrievePassword(successfulAuthentication);
+	
+  //省略部分 Check 逻辑...
+
+  // 计算 Token 声明周期默认为：1209600秒
+  int tokenLifetime = calculateLoginLifetime(request, successfulAuthentication);
+  // 计算过期日期
+  long expiryTime = System.currentTimeMillis();
+  expiryTime += 1000L * (tokenLifetime < 0 ? TWO_WEEKS_S : tokenLifetime);
+
+  // 生成数字签名并放到 Token 中
+  String signatureValue = makeTokenSignature(expiryTime, username, password);
+  setCookie(new String[] { username, Long.toString(expiryTime), signatureValue },
+            tokenLifetime, request, response);
+}
+// 计算数字签名
+protected String makeTokenSignature(long tokenExpiryTime, String username,
+                                    String password) {
+  String data = username + ":" + tokenExpiryTime + ":" + password + ":" + getKey();
+  MessageDigest digest;
+  try {
+    digest = MessageDigest.getInstance("MD5");
+  }
+  catch (NoSuchAlgorithmException e) {
+    throw new IllegalStateException("No MD5 algorithm available!");
+  }
+
+  return new String(Hex.encode(digest.digest(data.getBytes())));
+}
+```
+
+第二次访问的时候在 `RememberMeAuthenticationFilter` 的 `doFilter` 中首先尝试从 `SecurityContextHolder` 获取认证信息，如果认证信息没有了则尝试自动登录。
+
+```java
+// RememberMeAuthenticationFilter
+if (SecurityContextHolder.getContext().getAuthentication() == null) {
+  // 尝试自动登录
+  Authentication rememberMeAuth = rememberMeServices.autoLogin(request, response);
+  if (rememberMeAuth != null) {
+    try {
+      // 使用 authenticationManager 再次认证
+      rememberMeAuth = authenticationManager.authenticate(rememberMeAuth);
+      // 将认证信息保存的 SecurityContextHolder 中
+      SecurityContextHolder.getContext().setAuthentication(rememberMeAuth);
+      onSuccessfulAuthentication(request, response, rememberMeAuth);
+      // 触发发布事件
+      if (this.eventPublisher != null) {
+        eventPublisher.publishEvent(new InteractiveAuthenticationSuccessEvent(
+            SecurityContextHolder.getContext().getAuthentication(), this.getClass()));
+      }
+      if (successHandler != null) {
+        successHandler.onAuthenticationSuccess(request, response, rememberMeAuth);
+        return;
+      }
+    } catch (AuthenticationException authenticationException) {
+      rememberMeServices.loginFail(request, response);
+      onUnsuccessfulAuthentication(request, response, authenticationException);
+    }
+  }
+  chain.doFilter(request, response);
+}
+```
+
+```java
+// AbstractRememberMeServices
+public final Authentication autoLogin(HttpServletRequest request,
+                                      HttpServletResponse response) {
+	// 从请求中获取 Cookie
+  String rememberMeCookie = extractRememberMeCookie(request);
+  // Cookie 为 null 或者为空
+  if (rememberMeCookie == null) {
+    return null;
+  }
+  if (rememberMeCookie.length() == 0) {
+    cancelCookie(request, response);
+    return null;
+  }
+
+  UserDetails user = null;
+  try {
+    // 解码 cookie 信息
+    String[] cookieTokens = decodeCookie(rememberMeCookie);
+    // 根据 cookie 自动登录
+    user = processAutoLoginCookie(cookieTokens, request, response);
+    // 检查用户的信息过期等。
+    userDetailsChecker.check(user);
+		// 生成登录成功的凭据
+    return createSuccessfulAuthentication(request, user);
+  }
+  //...
+	// 删除 cookie
+  cancelCookie(request, response);
+  return null;
+}
+// 解码 Cookie
+protected String[] decodeCookie(String cookieValue) throws InvalidCookieException {
+  for (int j = 0; j < cookieValue.length() % 4; j++) {
+    cookieValue = cookieValue + "=";
+  }
+  try {
+    Base64.getDecoder().decode(cookieValue.getBytes());
+  } catch (IllegalArgumentException e) {
+    throw new InvalidCookieException(
+      "Cookie token was not Base64 encoded; value was '" + cookieValue
+      + "'");
+  }
+
+  String cookieAsPlainText = new String(Base64.getDecoder().decode(cookieValue.getBytes()));
+  String[] tokens = StringUtils.delimitedListToStringArray(cookieAsPlainText, DELIMITER);
+
+  for (int i = 0; i < tokens.length; i++) {
+    try {
+      tokens[i] = URLDecoder.decode(tokens[i], StandardCharsets.UTF_8.toString());
+    } catch (UnsupportedEncodingException e) {
+      logger.error(e.getMessage(), e);
+    }
+  }
+  return tokens;
+}
+```
+
+```java
+// TokenBasedRememberMeServices
+protected UserDetails processAutoLoginCookie(String[] cookieTokens,
+                                             HttpServletRequest request, HttpServletResponse response) {
+	// 获取过期时间
+  long tokenExpiryTime;
+  try {
+    tokenExpiryTime = new Long(cookieTokens[1]);
+  } catch (NumberFormatException nfe) {
+    throw new InvalidCookieException(
+      "Cookie token[1] did not contain a valid number (contained '"
+      + cookieTokens[1] + "')");
+  }
+	// 判断 Token 是否过期
+  if (isTokenExpired(tokenExpiryTime)) {
+    throw new InvalidCookieException("Cookie token[1] has expired (expired on '"
+                                     + new Date(tokenExpiryTime) + "'; current time is '" + new Date()
+                                     + "')");
+  }
+	// 根据用户名获取用户信息
+  UserDetails userDetails = getUserDetailsService().loadUserByUsername(cookieTokens[0]);
+  // 根据查到的用户名和密码构造 token
+  String expectedTokenSignature = makeTokenSignature(tokenExpiryTime, userDetails.getUsername(), userDetails.getPassword());
+	// 判断请求中 Token 和 实际的需要的 Token 是否相同，不同就抛出异常
+  if (!equals(expectedTokenSignature, cookieTokens[2])) {
+    throw new InvalidCookieException("Cookie token[2] contained signature '"
+                                     + cookieTokens[2] + "' but expected '" + expectedTokenSignature + "'");
+  }
+	// 相同就返回用户信息
+  return userDetails;
+}
+```
+
+上面主要是默认的使用 `TokenBasedRememberMeServices` 也可以指定使用 Spring 提供的另外一种方式 `PersistentTokenRepository`。
+
+可以通过以下方式启用：
+
+```java
+@Bean
+public PersistentTokenRepository persistentTokenRepository() {
+  JdbcTokenRepositoryImpl persistentTokenRepository = new JdbcTokenRepositoryImpl();
+  persistentTokenRepository.setDataSource(dataSource);
+  return persistentTokenRepository;
+}
+
+// config Method
+.rememberMe().tokenRepository(persistentTokenRepository())
+```
+
+
+
+其主要方法如下：
+
+```java
+// PersistentTokenRepository
+protected void onLoginSuccess(HttpServletRequest request,
+                              HttpServletResponse response, Authentication successfulAuthentication) {
+  String username = successfulAuthentication.getName();
+
+	// 根据用户名等信息, series 加密后的随机值等生成一个 Token
+  PersistentRememberMeToken persistentToken = new PersistentRememberMeToken(
+    username, generateSeriesData(), generateTokenData(), new Date());
+  try {
+    // 将 Token 存储起来：默认有两种实现
+    // 1. InMemoryTokenRepositoryImpl 默认实现放到内存中
+    // 2. JdbcTokenRepositoryImpl 放到数据库中
+    tokenRepository.createNewToken(persistentToken);
+    // 然后将 Token 添加到 Cookie 中
+    addCookie(persistentToken, request, response);
+  }
+  catch (Exception e) {
+    logger.error("Failed to save persistent token ", e);
+  }
+}
+// 添加到 Cookie 中
+private void addCookie(PersistentRememberMeToken token, HttpServletRequest request,
+			HttpServletResponse response) {
+  setCookie(new String[] { token.getSeries(), token.getTokenValue() },
+            getTokenValiditySeconds(), request, response);
+}
+// 基于 Token 自动登录
+protected UserDetails processAutoLoginCookie(String[] cookieTokens,
+			HttpServletRequest request, HttpServletResponse response) {
+
+  final String presentedSeries = cookieTokens[0];
+  final String presentedToken = cookieTokens[1];
+
+  PersistentRememberMeToken token = tokenRepository.getTokenForSeries(presentedSeries);
+
+  // 没有 Token 抛出异常
+  if (token == null) {
+    throw new RememberMeAuthenticationException(
+      "No persistent token found for series id: " + presentedSeries);
+  }
+	// 比较服务器中 Token 和 请求中的 Token 是否相同，不相同则情况 Token
+  if (!presentedToken.equals(token.getTokenValue())) {
+    tokenRepository.removeUserTokens(token.getUsername());
+    throw new CookieTheftException(messages.getMessage( "PersistentTokenBasedRememberMeServices.cookieStolen",
+        "Invalid remember-me token (Series/token) mismatch. Implies previous cookie theft attack."));
+  }
+	// Token 是否过期
+  if (token.getDate().getTime() + getTokenValiditySeconds() * 1000L < System
+      .currentTimeMillis()) {
+    throw new RememberMeAuthenticationException("Remember-me login has expired");
+  }
+	// 生成新的 Token
+  PersistentRememberMeToken newToken = new PersistentRememberMeToken(
+    token.getUsername(), token.getSeries(), generateTokenData(), new Date());
+
+  try {
+    // 更新 Token
+    tokenRepository.updateToken(newToken.getSeries(), newToken.getTokenValue(), newToken.getDate());
+    addCookie(newToken, request, response);
+  } catch (Exception e) {
+    logger.error("Failed to update token: ", e);
+    throw new RememberMeAuthenticationException( "Autologin failed due to data access problem");
+  }
+	// 返回用户信息
+  return getUserDetailsService().loadUserByUsername(token.getUsername());
+}
+```
+
