@@ -2,7 +2,8 @@
 title: "Spring Security"
 tags: ["Spring", "Spring Security"]
 categories: ["Spring"]
-date: "2020-02-15T09:00:00+08:00"
+date: "2020-05-15T09:00:00+08:00"
+toc: true
 ---
 
 [toc]
@@ -85,6 +86,44 @@ Spring Security 是 Spring 采用 AOP 思想，基于 Servlet 过滤器实现的
 
     获取所配置资源的访问授权信息，根据 SecurityContextHolder 中存储的用户信息决定是否有权限访问。
 
+![](http://img.programya.com/20200201140026.png)
+
+###  几个基本概念
+
+其中 FilterSecurityInterceptor 中会根据 config 配置的内容，判断是否可以访问对应的资源，如果不可以则会抛出异常。然后在 ExceptionTranslationFilter 中会捕获异常并作出响应的处理。
+
+Spring Security 几个重要的概念如下：
+
+1. SecurityContextHolder
+
+   Spring Security 提供的 SecurityContextHolder 类让程序可以方便访问 SecurityContext。其采用的是 ThreadLocal 方式存储，保证获取到的永远是当前用户的 SecurityContext。
+
+2. SecurityContext
+
+   SecurityContext 保存用户的信息，用户是谁，权限有哪些，是否被认证等。可以通过 SecurityContextHolder.getContext() 获取。
+
+3. Authentication
+
+   Authentication 包含 sessionId, IP, 用户的 UserDetail 信息，用户的角色。其有很多实现类，每种类都对应着一个认证方式。可以通过 SecurityContextHolder.getContext().getAuthentication(); 获取。
+
+4. AbstractAuthenticationToken
+
+   AbstractAuthenticationToken 和 AnonymousAuthenticationToken 及其很多子类都实现了 Authentication 接口，每一个子类代表一种认证方式。
+
+5. GenericFilterBean
+
+   用来拦截认证的 filter，可以在这个 filter 注册认证成功和失败的 handler，子类主要有 OncePerRequestFilter, CasAuthenticationFilter, OpenIDAuthenticationFilter, UsernamePasswordAuthenticationFilter, LogoutFilter 等等。
+
+6. AuthenticationManager 和 AuthenticationProvider
+
+   Spring  Security 将通过 SecurityFilter 来调用 AuthenticationManager 进行验证，默认情况下 AuthenticationManager 将验证工作交给 ProviderManager 去做，而 ProviderManager 会通过一系列的 AuthenticationProvider 完成具体的验证。
+
+7. UserDetails 和 UserDetailsService
+
+   UserDetail 包含 Authentication 需要的用户信息，这些信息往往从 JDBC 或其他数据源获取。UserDetailsService 是用来获取指定 username 对应 UserDetail 的接口。
+
+
+
 ### Spring Security 加载及应用 Filter 流程
 
 在 Spring Security 项目启动的时候会走到 `WebSecurityConfigurerAdapter` 的 `getHttp` 方法中，该方法中部分代码如下：
@@ -130,12 +169,21 @@ http
 默认会有一个密码打印在控制台中，测试的时候也可以直接在代码中定义一个用户：
 
 ```java
+// 方式 1
 @Bean
 @Override
 public UserDetailsService userDetailsService() {
   UserDetails userDetails = User.withDefaultPasswordEncoder().username("xinyue")
-    .password("xinyue").roles("USERS").build();
+    .password("xinyue").roles("ADMIN").build();
   return new InMemoryUserDetailsManager(userDetails);
+}
+// 方式 2
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+  auth.inMemoryAuthentication().withUser("xinyue")
+    .password("{noop}123")
+    .roles("ADMIN")
+    .authorities("admin", "demo");
 }
 ```
 
@@ -167,6 +215,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }
 ```
+
+> Spring Boot 项目中在 `WebSecurityEnablerConfiguration`  上的已经添加了 `@EnableWebSecurity`  所以在自己的配置类上可以不添加。
 
 上面第一个方法自定义了登录页面的地址为 `/ilogin` 页面，默认情况处理登录请求的地址也是 `/iloign` 只是 Method 是 POST，当然也可以通过相关的属性配置，例如 `loginProcessingUrl` 处理登录请求的 URL，`successForwardUrl` 登录成功之后跳转的地址，`defaultSuccessUrl`  也登录成功之后跳转的地址，只是其有一个默认为 false 的参数 `alwaysUse` 用于控制默认会跳转到登录前访问的页面 URL， `logoutSuccessUrl` 登出跳转地址，`failureForwardUrl` 登录失败跳转的地址。
 
@@ -821,6 +871,62 @@ protected UserDetails processAutoLoginCookie(String[] cookieTokens,
   }
 	// 返回用户信息
   return getUserDetailsService().loadUserByUsername(token.getUsername());
+}
+```
+
+## Spring Security 权限控制
+
+如果要使用注解控制不同请求的权限需要在 config 加上相关的注解开启，例如：
+
+```java
+@EnableGlobalMethodSecurity(prePostEnabled = true,  // Spring 指定的权限控制注解开关
+                            securedEnabled = true,  // Spring Security 内部权限控制注解开关
+                            jsr250Enabled = true)		// 开启 Java 250 注解支持
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+```
+
+```java
+// @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_DEMO') and hasAnyRole('MAINTAIN_PRODUCT')")  // Spring
+@Secured({"ROLE_ADMIN", "ROLE_DEMO"}) // Spring Security
+// @RolesAllowed({"ROLE_ADMIN", "ROLE_DEMO"})  // JSR 250
+@RequestMapping("/maintain")
+public String demo1() {
+  return "maintain";
+}
+```
+
+### 异常处理
+
+一种是通过实现 `HandlerExceptionResolver` 的方式实现，示例如下：
+
+```java
+@Component
+public class HandlerExceptionController implements HandlerExceptionResolver {
+    @Override
+    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        ModelAndView mv = new ModelAndView();
+        if (ex instanceof AccessDeniedException) {
+            mv.setViewName("redirect:/403");
+        } else {
+            mv.setViewName("redirect:/error");
+        }
+        return mv;
+    }
+}
+```
+
+一种是直接通过 `@ControllerAdvice` 注解，示例如下：
+
+```java
+public class HandlerExceptionAdvice {
+    @ExceptionHandler(AccessDeniedException.class)
+    public String accessDeniedException() {
+        return "redirect:/403”";
+    }
+    @ExceptionHandler(Exception.class)
+    public String exceptionHandler() {
+        return "redirect:/error”";
+    }
 }
 ```
 

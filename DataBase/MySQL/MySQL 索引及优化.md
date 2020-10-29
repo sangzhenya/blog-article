@@ -5,7 +5,7 @@ categories: ["MySQL"]
 date: "2019-05-21T09:00:00+08:00"
 ---
 
-### 索引
+## 索引
 
 索引是帮助 MySQL 高效获取数据的数据结构，即本质上就是一种数据结构。数据库在存储数据之外还维护者满足特定查找算法的数据结构，这些数据结构以某种方式引用数据，这样就可以在数据结构上实现高级的查找算法，一种索引方式如下图所示：
 
@@ -13,27 +13,27 @@ date: "2019-05-21T09:00:00+08:00"
 
 一般来说索引文件本身也很大，所以并不会全部存储在内存中，往往以索引文件的形式存储在磁盘上。
 
-### 索引分类
+## 索引分类
 
-#### 数据结构分类：
+### 数据结构分类
 
 1. B+ 树索引
 2. Hash 索引
 3. FullText 索引
 4. R-Tree 索引
 
-#### 物理存储分类：
+### 物理存储分类
 
 1. 聚集索引
 2. 非聚集索引
 
-#### 逻辑分类
+### 逻辑分类
 
 1. 单值索引：即一个索引仅包含单个列，一个表中可以有多个单值索引。
 2. 唯一索引：索引列的值必须是唯一的，允许有空值。
 3. 复合索引：即一个索引包含多个列。
 
-### 索引结构
+## 索引结构
 
 平常所说的索引都是指的 B 说结构组织的索引。其中聚集索引、次要索引、覆盖索引、前缀索引和唯一索引默认都是使用 B+ 树索引。此外还有哈希索引等。
 
@@ -49,9 +49,9 @@ B+ 树是 B 树的一种变形，非叶子节点只保存索引，不保存实�
 
 最后 B+ 树的数据存储在叶子结点中，分支节点均为索引，方便入库，只需要扫描一遍叶子结点即可，对于 B 树因为其分支节点同样存储着数据，所以要找到具体的数据需要进行一次树的遍历，所以 B+ 树更适合在区间查询的情况。
 
-### 索引的适用场景
+## 索引的适用场景
 
-#### 优势
+### 优势
 
 提高数据检索效率，降低数据库的 IO 成本。降低数据排序的成本，降低 CPU 的消耗。需要创建索引场景如下：
 
@@ -61,7 +61,7 @@ B+ 树是 B 树的一种变形，非叶子节点只保存索引，不保存实�
 4. 查询中排序的字段
 5. 查询中统计或者分组字段
 
-#### 劣势
+### 劣势
 
 索引会占据空间的。每次添加或更新索引列的字段，都要更新索引，会降低更新锁的表速度，对大数据量的表需要花时间研究最优索引。不需要创建索引的场景如下：
 
@@ -71,7 +71,7 @@ B+ 树是 B 树的一种变形，非叶子节点只保存索引，不保存实�
 4. 经常增删改的表
 5. 数据重复且分布平均的表字段，因此应该只是为最经常查询和最经常排序的数据列建立索引
 
-### 基本使用
+## 基本使用
 
 ```mysql
 -- 创建
@@ -85,7 +85,7 @@ drop index index_name on table_name;
 show index from table_name;
 ```
 
-### 常见瓶颈
+## 常见瓶颈
 
 一般发生在数据装入内存或从磁盘上读取数据的时候可能会出现 CPU 饱和，而 磁盘 IO 瓶颈发生在装入数据远大于内存容量的时候。
 
@@ -97,29 +97,29 @@ show index from table_name;
 
 #### id
 
-##### id 相同
+1. id 相同
 
-执行顺序由上至下
+   执行顺序由上至下
 
-```mysql
-explain select ce.id, ac.id from category ce where ce.id in (select ac.category_id from article ac);
-```
+   ```sql
+   explain select ce.id, ac.id from category ce where ce.id in (select ac.category_id from article ac);
+   ```
 
-![Explain ID 1](http://img.programya.com/Snipaste_2019-10-14_22-58-45.png)
+   ![Explain ID 1](http://img.programya.com/Snipaste_2019-10-14_22-58-45.png)
 
-##### id 不同
+2. id 不同
 
-如果是子查询，id 的序号递增，值越大优先级越高，越先被执行
+   如果是子查询，id 的序号递增，值越大优先级越高，越先被执行
 
-```mysql
-explain select ac.title from article ac where ac.category_id = (select ce.id from category ce where ce.id = 61);
-```
+   ```sql
+   explain select ac.title from article ac where ac.category_id = (select ce.id from category ce where ce.id = 61);
+   ```
 
-![id 不同](http://img.programya.com/Snipaste_2019-10-14_23-07-13.png)
+   ![id 不同](http://img.programya.com/Snipaste_2019-10-14_23-07-13.png)
 
-##### id 不同和相同同时存在
+3. id 不同和相同同时存在
 
-id 如果相同则可以认为是一组，从上往下执行；在所有组中，id 值越大，优先级越高，越先被执行。
+   id 如果相同则可以认为是一组，从上往下执行；在所有组中，id 值越大，优先级越高，越先被执行。
 
 #### select_type
 
@@ -184,7 +184,7 @@ id 如果相同则可以认为是一组，从上往下执行；在所有组中�
 
 1. Using filesort： 说明 MySQL 会对数据使用一个外部的索引排序，而不是按照表内的索引顺序进行读取。MySQL 中无法利用索引完成的排序操作称为 “文件排序”。
 2. Using temporary： 使用了临时表保存中间结果， MySQL 在对查询结果排序时使用临时表。常见于排序 order by 和分组查询 group by。
-3. Using index：表示相应的 色乐天 操作中使用了 覆盖索引，避免访问了表的数据行。如果同时出现 using where 表明索引被用来执行索引键值的查找；如果没有同时出现 using where 则表明索引用来读取数据而非执行查找动作。
+3. Using index：表示相应的 select 操作中使用了 覆盖索引，避免访问了表的数据行。如果同时出现 using where 表明索引被用来执行索引键值的查找；如果没有同时出现 using where 则表明索引用来读取数据而非执行查找动作。
 4. Using where：使用了 where 过滤。
 5. Using join buffer：使用了连接缓存
 6. impossible where： where 字句的值总是 false，不能用来获取任何元祖。
